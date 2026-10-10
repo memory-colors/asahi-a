@@ -1,0 +1,23 @@
+<?xml version="1.1" encoding="UTF-8"?>
+
+<channel name="ristretto" version="1.0">
+  <property name="window" type="empty">
+    <property name="navigationbar" type="empty">
+      <property name="position" type="string" value="left"/>
+    </property>
+    <property name="bgcolor-override" type="bool" value="true"/>
+    <property name="bgcolor" type="array">
+      <value type="double" value="0.10588235294117647"/>
+      <value type="double" value="0.10588235294117647"/>
+      <value type="double" value="0.11372549019607843"/>
+      <value type="double" value="1"/>
+    </property>
+    <property name="maximize-on-startup" type="bool" value="false"/>
+  </property>
+  <property name="desktop" type="empty">
+    <property name="type" type="string" value="gnome"/>
+  </property>
+  <property name="file" type="empty">
+    <property name="current-uri" type="string" value="file:///home/blank/Screenshots"/>
+  </property>
+</channel>

@@ -1,0 +1,23 @@
+{
+  "apps": [
+    "org.gnome.Nautilus.desktop",
+    "org.gnome.Terminal.desktop",
+    "org.gnome.Software.desktop",
+    "org.gnome.Calculator.desktop",
+    "org.gnome.TextEditor.desktop"
+  ],
+  "order": [
+    "org.kde.dolphin.desktop",
+    "brave-browser.desktop",
+    "smplayer.desktop",
+    "brave-geijiaoeofpopobjcbeafpacnjmhilfn-Default.desktop",
+    "com.interversehq.qView.desktop",
+    "claude-desktop-unofficial.desktop",
+    "veracrypt.desktop",
+    "transmission-gtk.desktop",
+    "restart-to-macos.desktop",
+    "org.kde.konsole.desktop",
+    "com.mattjakeman.ExtensionManager.desktop"
+  ],
+  "folders": []
+}

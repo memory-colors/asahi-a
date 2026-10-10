@@ -1,0 +1,141 @@
+/* Personal overrides on top of adw-gtk3-dark - just accent color and
+   headerbar/titlebar grey, kept in sync with the gtk-4.0 theme pack and the
+   modded Qt window-decoration plugin (both use #1f1f24 for the titlebar).
+   Everything else is left to adw-gtk3-dark itself. */
+
+/* #5a3e8b is the REAL accent used by gtk-4.0/gtk.css (accent_bg_color there is
+   flat #5a3e8b, not lightened) - #9141ac was wrong, used here by mistake for
+   most of a very long debugging session. Corrected 2026-09-26. */
+@define-color accent_bg_color #5a3e8b;
+@define-color accent_color #5a3e8b;
+@define-color headerbar_bg_color #1f1f24;
+
+/* This theme's checkboxes, list-row selections, and text-selection highlight
+   consult theme_selected_bg_color/selected_bg_color specifically - a
+   SEPARATE variable pair from accent_bg_color/accent_color, hardcoded to
+   #606d80 (blue-grey) in the theme file itself, completely disconnected
+   from the accent override above. That's the actual cause of "highlights
+   and checkboxes still blue" even with accent_bg_color redefined. */
+@define-color theme_selected_bg_color #5a3e8b;
+@define-color selected_bg_color #5a3e8b;
+
+/* Suggested-action buttons (e.g. file-picker "Open") use
+   mix(white, @accent_bg_color, 0.9/0.85/0.7/0.65) across states - a
+   deliberate lightened-accent convention, not a bug, but the user wants
+   flat #5a3e8b with no white mix at all, same as the selection highlight. */
+button.suggested-action,
+button.suggested-action:hover,
+button.suggested-action:active,
+button.suggested-action:checked,
+button.suggested-action:active:hover,
+button.suggested-action:checked:hover {
+  background-color: #5a3e8b;
+}
+
+/* Row selection highlight (VeraCrypt's slot list, the GTK file-chooser
+   portal, etc) rendered as a muddy dim purple (~#2f263d) instead of the
+   real accent. Root cause found 2026-10-01 by reading adw-gtk3-dark's own
+   gtk-dark.css directly: the base `row:selected` rule (not a :backdrop/
+   focus-state variant - that guess was wrong) uses
+   `background-color: alpha(currentColor, 0.1)` - only 10% alpha of
+   whatever `color` happens to be, not the accent at all. Combined with
+   `row { transition: all 150ms ...; }`, this is also why the correct
+   accent flashes briefly on selection before fading to the dim resting
+   state. Fixed by overriding the base rule directly - both bits need their
+   own `!important`-equivalent cascade position since the theme defines
+   row:selected and row.activatable:selected/:backdrop as separate rules. */
+row:selected,
+row.activatable:selected,
+row.activatable:selected:backdrop,
+row:selected:backdrop,
+treeview.view:selected,
+treeview.view:selected:backdrop,
+.view:selected,
+.view:selected:backdrop,
+list row:selected,
+list row:selected:backdrop {
+  background-color: @accent_bg_color;
+  color: @accent_fg_color;
+}
+
+/* adw-gtk3-dark's own headerbar:backdrop rule keeps background-color identical
+   (#1f1f24 both states) but dims border-color and text color when inactive -
+   force those to match the active state too, so only the traffic light PNGs
+   themselves change (via the :backdrop rule below), nothing else about the
+   titlebar. */
+headerbar:backdrop {
+  color: #FDFDFD;
+  border-color: mix(black, #1f1f24, 0.25);
+}
+
+/* Traffic light titlebuttons — overrides adw-gtk3-dark's CSS circles */
+headerbar button.titlebutton.close,
+headerbar button.titlebutton.maximize,
+headerbar button.titlebutton.minimize {
+  min-width: 19px;
+  min-height: 19px;
+  padding: 0;
+  margin: 0 1px;
+  background-color: transparent;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 19px 19px;
+  border-color: transparent;
+  box-shadow: none;
+}
+/* Hide the symbolic icon inside each button */
+headerbar button.titlebutton.close > image,
+headerbar button.titlebutton.maximize > image,
+headerbar button.titlebutton.minimize > image {
+  color: transparent;
+}
+headerbar button.titlebutton.close:hover,
+headerbar button.titlebutton.maximize:hover,
+headerbar button.titlebutton.minimize:hover,
+headerbar button.titlebutton.close:active,
+headerbar button.titlebutton.maximize:active,
+headerbar button.titlebutton.minimize:active {
+  background-color: transparent;
+}
+/* Backdrop (inactive window): clear our PNG so adw-gtk3-dark's faint circle shows */
+headerbar button.titlebutton.close:backdrop,
+headerbar button.titlebutton.maximize:backdrop,
+headerbar button.titlebutton.minimize:backdrop {
+  background-image: none;
+}
+headerbar button.titlebutton.close        { background-image: -gtk-scaled(url("windows-assets/titlebutton-close-dark.png"),        url("windows-assets/titlebutton-close-dark@2.png")); }
+headerbar button.titlebutton.close:hover  { background-image: -gtk-scaled(url("windows-assets/titlebutton-close-hover-dark.png"),  url("windows-assets/titlebutton-close-hover-dark@2.png")); }
+headerbar button.titlebutton.close:active { background-image: -gtk-scaled(url("windows-assets/titlebutton-close-active-dark.png"), url("windows-assets/titlebutton-close-active-dark@2.png")); }
+
+headerbar button.titlebutton.minimize        { background-image: -gtk-scaled(url("windows-assets/titlebutton-minimize-dark.png"),        url("windows-assets/titlebutton-minimize-dark@2.png")); }
+headerbar button.titlebutton.minimize:hover  { background-image: -gtk-scaled(url("windows-assets/titlebutton-minimize-hover-dark.png"),  url("windows-assets/titlebutton-minimize-hover-dark@2.png")); }
+headerbar button.titlebutton.minimize:active { background-image: -gtk-scaled(url("windows-assets/titlebutton-minimize-active-dark.png"), url("windows-assets/titlebutton-minimize-active-dark@2.png")); }
+
+headerbar button.titlebutton.maximize        { background-image: -gtk-scaled(url("windows-assets/titlebutton-maximize-dark.png"),        url("windows-assets/titlebutton-maximize-dark@2.png")); }
+headerbar button.titlebutton.maximize:hover  { background-image: -gtk-scaled(url("windows-assets/titlebutton-maximize-hover-dark.png"),  url("windows-assets/titlebutton-maximize-hover-dark@2.png")); }
+headerbar button.titlebutton.maximize:active { background-image: -gtk-scaled(url("windows-assets/titlebutton-maximize-active-dark.png"), url("windows-assets/titlebutton-maximize-active-dark@2.png")); }
+
+/* No dotted/dashed focus outlines anywhere (user request 2026-10-02). The base
+   adw-gtk3-dark theme draws them via a global `* { outline-style: dashed; ... }`
+   and `list row { outline-style: solid }`. Overriding at user priority beats both
+   regardless of selector specificity. This also covers wxGTK (VeraCrypt main
+   window), which renders its list focus ring on a hand-built style node that no
+   class/element selector matched. Trade-off: no keyboard-focus outline on any
+   GTK3 widget that relied on these. To restore, delete this block. */
+* {
+  outline-style: none;
+  outline-width: 0;
+  outline-color: transparent;
+}
+list row {
+  outline-style: none;
+  outline-width: 0;
+}
+
+/* KNOMADIC: text-brightness BEGIN (2026-10-09) - subtext/dim labels (main text left at adw-gtk3's white) 0.55 -> 0.75 opacity */
+.dim-label, .welcome .dim-label,
+headerbar .subtitle, .titlebar:not(headerbar) .subtitle, label.separator,
+row label.subtitle {
+  opacity: 0.75;
+}
+/* KNOMADIC: text-brightness END */

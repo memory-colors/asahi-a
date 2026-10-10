@@ -1,0 +1,24 @@
+[Desktop Entry]
+Type=Application
+TryExec=konsole
+Exec=/home/blank/.local/bin/konsole
+Icon=utilities-terminal
+Categories=Qt;KDE;System;TerminalEmulator;
+Actions=NewWindow;NewTab;
+StartupNotify=true
+X-KDE-AuthorizeAction=shell_access
+X-KDE-Shortcuts=Ctrl+Alt+T
+StartupWMClass=konsole
+Name=Konsole
+GenericName=Terminal
+Comment=Use the command line
+
+[Desktop Action NewWindow]
+Name=Open New Window
+Icon=window-new
+Exec=/home/blank/.local/bin/konsole
+
+[Desktop Action NewTab]
+Name=Open New Tab
+Icon=tab-new
+Exec=/home/blank/.local/bin/konsole --new-tab

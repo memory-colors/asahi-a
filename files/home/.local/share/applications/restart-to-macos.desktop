@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Reboot to...
+Comment=Choose macOS, Asahi, or Asahi Atomic and reboot into it
+Exec=/usr/local/bin/reboot-picker
+Icon=shutdown.svg
+StartupWMClass=org.gnome.Zenity
+Terminal=false
+StartupNotify=true
+Categories=System;
+Keywords=Asahi;macOS;reboot;

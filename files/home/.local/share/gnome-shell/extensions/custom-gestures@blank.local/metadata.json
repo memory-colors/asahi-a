@@ -1,0 +1,7 @@
+{
+  "name": "Custom Touchpad Gestures (blank)",
+  "description": "Personal touchpad gesture set: 3-finger up/down (overview/minimize), 3-finger left/right (tile, per-app overrides for Brave/Dolphin), 3-finger pinch (Dolphin split view), 4-finger up/down (fullscreen or maximize/quit), 4-finger left/right (workspace switch). Also handles Brave-opens-in-new-workspace and workspace compaction. Fully self-contained, no dependency on any other touchpad gesture extension.",
+  "uuid": "custom-gestures@blank.local",
+  "shell-version": ["48", "49", "50"],
+  "settings-schema": "org.gnome.shell.extensions.custom-gestures"
+}

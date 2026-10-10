@@ -1,0 +1,17 @@
+{
+  "name": "Dhruva (blank)",
+  "description": "A buttery smooth, highly animated Dock for GNOME Shell. Personal fork of Dhruva, forked to be self-contained (own UUID, no dependency on the upstream repo/extensions.gnome.org still existing). Includes local theming tweaks: solid popup/context-menu background color, simplified window-thumbnail cards (no screenshot/title clutter), and a peek-effect gsettings gate.",
+  "settings-schema": "org.gnome.shell.extensions.dhruva",
+  "shell-version": [
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51"
+  ],
+  "uuid": "dhruva@blank.local",
+  "version": 17,
+  "version-name": "2.0"
+}

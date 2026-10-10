@@ -1,0 +1,19 @@
+/*
+ * stylesheet.css – Rounded Window Corners
+ *
+ * Applied to the GNOME Shell process only (not to preferences).
+ * The .rwc-shadow class targets the inner St.Bin used for custom shadows.
+ */
+
+/* The outer "shadow actor" container – transparent, just for geometry */
+.rwc-shadow {
+    background:    transparent;
+}
+
+/* Quick Settings / Date Menu layout (qs/quickSettings.js) */
+.datemenu-popover.knomadic-qs-hide-left-box .datemenu-calendar-column {
+    margin: 0px;
+}
+#panel .knomadic-qs-privacy-monochrome .privacy-indicator {
+    color: -st-accent-fg-color;
+}

@@ -1,0 +1,37 @@
+<svg width="16" height="16" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="clip-minimize-active">
+      <circle cx="8" cy="8" r="7"/>
+    </clipPath>
+    <!-- Main body: vertical gradient from pixel samples -->
+    <linearGradient id="body-minimize-active" x1="8" y1="1" x2="8" y2="15" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#dc9e00"/>
+      <stop offset="18%" stop-color="#de9c00"/>
+      <stop offset="45%" stop-color="#dfa000"/>
+      <stop offset="65%" stop-color="#e0aa00"/>
+      <stop offset="80%" stop-color="#e3b520"/>
+      <stop offset="100%" stop-color="#e4b820"/>
+    </linearGradient>
+    <!-- Top specular spot: bright highlight at top of sphere -->
+    <radialGradient id="st-minimize-active" cx="8" cy="2.0" r="3.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#d8d850"/>
+      <stop offset="45%"  stop-color="#e8d030" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#e8d030" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Bottom specular spot: subtle secondary highlight -->
+    <radialGradient id="sb-minimize-active" cx="8" cy="13.5" r="2.8" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#e8d030" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#e8d030" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Invisible bounding rect (matches original SVG convention) -->
+  <rect width="16" height="16" opacity="0"/>
+  <!-- Main body -->
+  <circle cx="8" cy="8" r="7" fill="url(#body-minimize-active)"/>
+  <!-- Top specular overlay (clipped to circle) -->
+  <rect x="1" y="1" width="14" height="7" fill="url(#st-minimize-active)" clip-path="url(#clip-minimize-active)"/>
+  <!-- Bottom specular overlay (clipped to circle) -->
+  <rect x="1" y="8" width="14" height="7" fill="url(#sb-minimize-active)" clip-path="url(#clip-minimize-active)"/>
+  <!-- Icon overlay for hover/active states -->
+  <rect x="3.9999" y="7.0095" width="8.0001" height="2" ry=".99998" opacity=".5"/>
+</svg>

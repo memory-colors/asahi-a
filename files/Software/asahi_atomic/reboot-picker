@@ -1,0 +1,146 @@
+#!/usr/bin/bash
+# Unprivileged GUI wrapper: ask which OS to reboot into.
+#
+# asahi/asahi_atomic need root (asahi-bless has to write a one-time NVRAM
+# override) - hand off to reboot-picker-helper via passwordless sudo, a
+# sudoers rule scoped to this exact binary (/etc/sudoers.d/reboot-picker),
+# same pattern as the macOS-side Restart Helper app's own `sudo -n` approach
+# - pkexec was dropped since sudoers NOPASSWD rules don't apply to it at all
+# (separate polkit authorization system).
+#
+# macOS needs NONE of that, and as of 2026-09-20 no longer goes through the
+# helper at all: macOS is always the persistent NVRAM boot default already
+# (asahi-bless is only ever used to set a one-time override AWAY from it),
+# so getting back to macOS never required a privileged NVRAM write in the
+# first place - just an ordinary reboot. `systemctl reboot` goes through
+# systemd-logind + polkit, which authorizes the active local session's own
+# user without a password by default (confirmed via `pkcheck --action-id
+# org.freedesktop.login1.reboot` returning success unprompted on this
+# machine) - no sudo, no helper, no sudoers dependency, and one less thing
+# that can break for the one target that matters most (getting back to the
+# daily-driver OS). This also sidesteps a real bug hit in the old path:
+# `asahi-bless --set-boot-macos` turned out to rely on a volume-name
+# heuristic ("starts with Macintosh") that doesn't match this Mac's actual
+# volume name ("Computer"), so it failed outright every time - moot now.
+#
+# No confirmation dialog, no password prompt either way - the picker's own
+# OK button is the only gate, per explicit user request (they close
+# everything before opening this).
+set -euo pipefail
+
+HELPER=${HELPER:-/usr/local/libexec/reboot-picker-helper}
+SUDO=${SUDO:-/usr/bin/sudo}
+SYSTEMCTL=${SYSTEMCTL:-/usr/bin/systemctl}
+DESKTOP_FILE=${DESKTOP_FILE:-$HOME/.local/share/applications/restart-to-macos.desktop}
+
+# Read the dialog icon straight from the .desktop file's Icon= line rather
+# than hardcoding it here too - change the icon in one place (the .desktop
+# file) and this picks it up automatically next launch.
+DIALOG_ICON="preferences-desktop-icons"
+if [[ -r "$DESKTOP_FILE" ]]; then
+  found=$(sed -n 's/^Icon=//p' "$DESKTOP_FILE" | head -n1)
+  [[ -n "$found" ]] && DIALOG_ICON="$found"
+fi
+
+show_error() {
+  local message=$1
+  if command -v zenity >/dev/null 2>&1; then
+    zenity --error --width=360 --text="$message" >/dev/null 2>&1 || true
+    return
+  fi
+  if command -v kdialog >/dev/null 2>&1; then
+    kdialog --error "$message" >/dev/null 2>&1 || true
+    return
+  fi
+  printf '%s\n' "$message" >&2
+}
+
+if [[ ! -x "$SYSTEMCTL" ]]; then
+  show_error "systemctl not found."
+  exit 1
+fi
+
+GNOME_SESSION_QUIT=${GNOME_SESSION_QUIT:-/usr/bin/gnome-session-quit}
+
+CHOICE=""
+if command -v zenity >/dev/null 2>&1; then
+  CHOICE=$(zenity --list --title="Reboot to..." \
+    --icon="$DIALOG_ICON" \
+    --text="Choose the next boot target:" \
+    --radiolist --column="Pick" --column="Target" --print-column=2 \
+    --width=420 --height=370 \
+    TRUE  "logout" \
+    FALSE "macos" \
+    FALSE "asahi" \
+    FALSE "asahi_atomic" \
+    2>/dev/null) || exit 0
+elif command -v kdialog >/dev/null 2>&1; then
+  CHOICE=$(kdialog --title "Reboot to..." --radiolist "Choose the next boot target:" \
+    logout "logout" on \
+    macos "macos" off \
+    asahi "asahi" off \
+    asahi_atomic "asahi_atomic" off \
+    2>/dev/null) || exit 0
+else
+  show_error "No supported GUI dialog tool found. Install zenity or kdialog."
+  exit 1
+fi
+
+[[ -n "$CHOICE" ]] || exit 0
+
+case "$CHOICE" in
+  logout)
+    TARGET=logout
+    LABEL="Log Out"
+    ;;
+  macos)
+    TARGET=macos
+    LABEL="macOS"
+    ;;
+  asahi)
+    TARGET=asahi
+    LABEL="Asahi"
+    ;;
+  asahi_atomic)
+    TARGET=asahi_atomic
+    LABEL="Asahi Atomic"
+    ;;
+  *)
+    show_error "Unrecognized choice: $CHOICE"
+    exit 1
+    ;;
+esac
+
+if [[ "$TARGET" = "macos" ]]; then
+  # No NVRAM write needed - macOS is already the persistent default. Plain
+  # unprivileged reboot, no sudo/helper involved at all (see header comment).
+  if ! "$SYSTEMCTL" reboot; then
+    show_error "Failed to restart (systemctl reboot)."
+    exit 1
+  fi
+elif [[ "$TARGET" = "logout" ]]; then
+  # Doesn't touch NVRAM/boot target at all - stays logged into whichever OS
+  # is already running. Unprivileged, same mechanism the logout keybinding
+  # itself uses. No confirmation, matching this picker's existing policy.
+  if [[ ! -x "$GNOME_SESSION_QUIT" ]]; then
+    show_error "gnome-session-quit not found."
+    exit 1
+  fi
+  if ! "$GNOME_SESSION_QUIT" --logout --no-prompt; then
+    show_error "Failed to log out (gnome-session-quit)."
+    exit 1
+  fi
+else
+  if [[ ! -x "$HELPER" ]]; then
+    show_error "Missing helper at $HELPER. Reinstall reboot-picker-helper."
+    exit 1
+  fi
+  if [[ ! -x "$SUDO" ]]; then
+    show_error "sudo not found."
+    exit 1
+  fi
+  if ! "$SUDO" -n "$HELPER" "$TARGET"; then
+    show_error "Failed to set boot target to ${LABEL} and restart. (Is the sudoers rule in /etc/sudoers.d/reboot-picker installed?)"
+    exit 1
+  fi
+fi

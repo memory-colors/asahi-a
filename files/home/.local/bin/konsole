@@ -1,0 +1,25 @@
+#!/bin/bash
+# Always tile new Konsole windows right, same technique as the SMPlayer
+# wrapper (ydotool simulating the real Alt+Super+Right tile-right shortcut
+# from outside the Wayland sandbox - GNOME gives apps no way to request
+# their own position/size on Wayland).
+#
+# Uses exec (not `&`+`wait` like the SMPlayer wrapper) so the real konsole
+# binary replaces this script's own process image instead of running as its
+# child. Real incident, 2026-09-26: with `&`+`wait`, GNOME's app/window
+# tracking (which keys off the process the .desktop file's Exec= line
+# originally launched) lost track of the actual window - dhruva's dock then
+# saw "no windows for this app" on every click and relaunched via Exec=
+# instead of focusing the existing window, spawning a new tiled window on
+# top of the old one every time ("bounce"). exec keeps the same PID GNOME
+# already associated with the launch, so tracking stays correct.
+#
+# The tile-right key simulation runs as a detached background subshell
+# started BEFORE the exec, since exec never returns to run anything after it.
+(
+    sleep 0.8
+    YDOTOOL_SOCKET=/tmp/.ydotool_socket ydotool key 56:1 125:1 106:1 106:0 125:0 56:0 2>/dev/null || true
+) &
+disown
+
+exec /usr/bin/konsole -stylesheet /home/blank/.themes/dolphin-theme/dolphin-theme.qss "$@"

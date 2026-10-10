@@ -1,0 +1,1 @@
+blank ALL=(root) NOPASSWD: /usr/local/libexec/reboot-picker-helper

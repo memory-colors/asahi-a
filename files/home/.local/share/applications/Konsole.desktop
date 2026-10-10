@@ -1,0 +1,7 @@
+[Desktop Entry]
+Exec=/usr/bin/konsole
+MimeType=application/x-shellscript;
+Name=konsole
+NoDisplay=true
+Terminal=true
+Type=Application

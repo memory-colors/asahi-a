@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Knomadic
+Exec=gnome-extensions prefs knomadic@blank.local
+Icon=preferences-system
+Type=Application
+Categories=Settings;

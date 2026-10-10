@@ -1,0 +1,7 @@
+{
+  "uuid": "gdm-single-user@blank.local",
+  "name": "GDM single user",
+  "description": "On the GDM greeter, skip the user list when there is exactly one user: go straight to that user's password prompt.",
+  "shell-version": ["50"],
+  "session-modes": ["gdm"]
+}

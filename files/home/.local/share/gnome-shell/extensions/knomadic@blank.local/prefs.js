@@ -1,0 +1,908 @@
+/**
+ * prefs.js – Preferences window for Rounded Window Corners
+ *
+ * UI is built with libadwaita (Adw) widgets on top of GTK4, following the
+ * GNOME 45+ ExtensionPreferences API.
+ */
+
+import Adw from 'gi://Adw';
+import Gdk from 'gi://Gdk';
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
+import Gtk from 'gi://Gtk';
+import GnomeDesktop from 'gi://GnomeDesktop?version=4.0';
+import Pango from 'gi://Pango';
+
+import { getThemeDirs } from './theme/util.js';
+import { addQsLayoutGroups } from './qs/prefs.js';
+
+import {
+    ExtensionPreferences,
+    gettext as _,
+} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Small GTK4 helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Bind a Gtk.Adjustment to a GSettings integer key (bidirectional). */
+function bindAdjInt(settings, key, adj) {
+    adj.value = settings.get_int(key);
+    adj.connect('value-changed', a => settings.set_int(key, a.value));
+    settings.connect(`changed::${key}`, () => {
+        if (adj.value !== settings.get_int(key))
+            adj.value = settings.get_int(key);
+    });
+}
+
+/** Bind a Gtk.Adjustment to a GSettings double key (bidirectional). */
+function bindAdjDbl(settings, key, adj) {
+    adj.value = settings.get_double(key);
+    adj.connect('value-changed', a => settings.set_double(key, a.value));
+    settings.connect(`changed::${key}`, () => {
+        if (Math.abs(adj.value - settings.get_double(key)) > 1e-9)
+            adj.value = settings.get_double(key);
+    });
+}
+
+/** Bind a Gtk.Switch / Adw.SwitchRow active state to a GSettings bool key. */
+function bindBool(settings, key, widget) {
+    settings.bind(key, widget, 'active', 0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// System color pickers (kcolorchooser -> machine-setup bash scripts)
+// ─────────────────────────────────────────────────────────────────────────────
+// kcolorchooser-only stylesheet: no frame around the preview swatch (~/.themes/qt6ct/qss/kcolorchooser.qss)
+const KCOLOR_QSS = ['-stylesheet', GLib.build_filenamev([GLib.get_home_dir(), '.themes', 'qt6ct', 'qss', 'kcolorchooser.qss'])];
+const MACHINE_SETUP_DIR = GLib.build_filenamev([GLib.get_home_dir(), '.themes', 'machine-setup']);
+
+// kcolorchooser --print writes lines like "#1b1b1d" to stdout.
+function parseKColorChooserOutput(stdout) {
+    const m = stdout.match(/#?([0-9a-fA-F]{6})/);
+    return m ? m[1].toLowerCase() : null;
+}
+
+// Small color-swatch box, same spirit as the original border-color
+// Gtk.ColorButton's own swatch - shows what the role is currently set to.
+function makeColorSwatch(hex) {
+    const swatch = new Gtk.Box({
+        width_request:  66,
+        height_request: 33,
+        valign: Gtk.Align.CENTER,
+        css_classes: ['color-swatch-box'],
+    });
+    updateSwatchColor(swatch, hex);
+    return swatch;
+}
+
+function updateSwatchColor(swatch, hex) {
+    const provider = new Gtk.CssProvider();
+    provider.load_from_data(
+        `.color-swatch-box { background-color: #${hex}; border-radius: 6px; border: 1px solid alpha(#ffffff, 0.25); }`,
+        -1);
+    swatch.get_style_context().add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+}
+
+// Ask the script for its live current value without opening the picker -
+// used to populate each row's swatch as soon as the prefs window opens.
+function queryCurrentHex(scriptPath, extraArgs, callback) {
+    try {
+        const getter = Gio.Subprocess.new(
+            ['/bin/bash', scriptPath, ...extraArgs, '--get'],
+            Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+        getter.communicate_utf8_async(null, null, (p, res) => {
+            let stdout = '';
+            try {
+                [, stdout] = p.communicate_utf8_finish(res);
+            } catch (e) { /* leave callback(null) below */ }
+            const hex = p.get_successful() ? parseKColorChooserOutput(stdout) : null;
+            callback(hex);
+        });
+    } catch (e) {
+        callback(null);
+    }
+}
+
+function pickColorThenApply(currentHex, scriptName, statusLabel, extraArgs = [], swatch = null) {
+    const scriptPath = GLib.build_filenamev([MACHINE_SETUP_DIR, scriptName]);
+    try {
+        const picker = Gio.Subprocess.new(
+            ['kcolorchooser', ...KCOLOR_QSS, '--print', '--color', `#${currentHex}`],
+            Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+        picker.communicate_utf8_async(null, null, (p, res) => {
+            let stdout;
+            try {
+                [, stdout] = p.communicate_utf8_finish(res);
+            } catch (e) {
+                statusLabel.label = `${_('Error')}: ${e.message}`;
+                return;
+            }
+            const hex = parseKColorChooserOutput(stdout);
+            if (!p.get_successful() || !hex) {
+                statusLabel.label = _('Cancelled');
+                return;
+            }
+            statusLabel.label = _('Applying…');
+            try {
+                const applier = Gio.Subprocess.new(
+                    ['/bin/bash', scriptPath, ...extraArgs, hex],
+                    Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+                applier.communicate_utf8_async(null, null, (p2, res2) => {
+                    let stderr2;
+                    try {
+                        [, , stderr2] = p2.communicate_utf8_finish(res2);
+                    } catch (e) {
+                        statusLabel.label = `${_('Error')}: ${e.message}`;
+                        return;
+                    }
+                    statusLabel.label = p2.get_successful()
+                        ? `${_('Applied')} #${hex}` : `${_('Error')}: ${stderr2.trim()}`;
+                    if (p2.get_successful() && swatch)
+                        updateSwatchColor(swatch, hex);
+                });
+            } catch (e) {
+                statusLabel.label = `${_('Error')}: ${e.message}`;
+            }
+        });
+    } catch (e) {
+        statusLabel.label = `${_('Error')}: ${e.message}`;
+    }
+}
+
+// Ask the script for its live current value (`<script> ...extraArgs --get`)
+// before opening kcolorchooser, so the picker opens pre-selected on the
+// actually-active color instead of blank/a stale hardcoded guess. Falls
+// back to fallbackHex if the script's --get support is missing or fails.
+function getCurrentHexThenPick(scriptPath, extraArgs, fallbackHex, scriptName, statusLabel, swatch) {
+    try {
+        const getter = Gio.Subprocess.new(
+            ['/bin/bash', scriptPath, ...extraArgs, '--get'],
+            Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+        getter.communicate_utf8_async(null, null, (p, res) => {
+            let stdout = '';
+            try {
+                [, stdout] = p.communicate_utf8_finish(res);
+            } catch (e) { /* fall through to fallback */ }
+            const hex = (p.get_successful() && parseKColorChooserOutput(stdout)) || fallbackHex;
+            pickColorThenApply(hex, scriptName, statusLabel, extraArgs, swatch);
+        });
+    } catch (e) {
+        pickColorThenApply(fallbackHex, scriptName, statusLabel, extraArgs, swatch);
+    }
+}
+
+function makeColorPickRow(title, currentHexGuess, scriptName, extraArgs = []) {
+    const row = new Adw.ActionRow({ title });
+    const swatch = makeColorSwatch(currentHexGuess);
+    const statusLabel = new Gtk.Label({
+        label:  '',
+        xalign: 1,
+        valign: Gtk.Align.CENTER,
+        css_classes: ['dim-label'],
+    });
+    const pickBtn = new Gtk.Button({
+        label:  _('Pick…'),
+        valign: Gtk.Align.CENTER,
+    });
+    const scriptPath = GLib.build_filenamev([MACHINE_SETUP_DIR, scriptName]);
+    // Populate the swatch with the ACTUAL current value as soon as the
+    // window opens, rather than leaving it on the hardcoded guess.
+    queryCurrentHex(scriptPath, extraArgs, hex => {
+        if (hex) updateSwatchColor(swatch, hex);
+    });
+    pickBtn.connect('clicked', () => {
+        getCurrentHexThenPick(scriptPath, extraArgs, currentHexGuess, scriptName, statusLabel, swatch);
+    });
+    row.add_suffix(swatch);
+    row.add_suffix(statusLabel);
+    row.add_suffix(pickBtn);
+    row.activatable_widget = pickBtn;
+    return row;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spin-row builder (Adw.ActionRow + Gtk.SpinButton as suffix widget)
+// ─────────────────────────────────────────────────────────────────────────────
+function makeSpinRow(title, min, max, step, digits = 0) {
+    const adj  = new Gtk.Adjustment({ lower: min, upper: max, step_increment: step });
+    const spin = new Gtk.SpinButton({
+        adjustment:   adj,
+        digits:       digits,
+        valign:       Gtk.Align.CENTER,
+        width_chars:  5,
+    });
+    const row = new Adw.ActionRow({ title });
+    row.add_suffix(spin);
+    row.activatable_widget = spin;
+    return { row, adj, spin };
+}
+
+// Pages have no icon_name, and AdwViewSwitcher then shows the "image-missing" icon on every tab. Hide the icons so the
+// tabs are text only (done by walking the window's widget tree; the switcher buttons are created by libadwaita).
+function hideViewSwitcherIcons(root) {
+    const hideImages = (w) => {
+        for (let c = w.get_first_child(); c; c = c.get_next_sibling()) {
+            if (c instanceof Gtk.Image)
+                c.set_visible(false);
+            hideImages(c);
+        }
+    };
+    const walk = (w) => {
+        for (let c = w.get_first_child(); c; c = c.get_next_sibling()) {
+            if (c instanceof Adw.ViewSwitcher || c instanceof Adw.ViewSwitcherBar)
+                hideImages(c);
+            else
+                walk(c);
+        }
+    };
+    walk(root);
+}
+
+// Installed theme names for the dropdown buttons (kind: 'icons' | 'cursor' | 'gtk3').
+function installedThemes(kind) {
+    const home = GLib.get_home_dir();
+    const dirs = kind === 'gtk3'
+        ? [`${home}/.themes`, `${home}/.local/share/themes`, '/usr/share/themes']
+        : [`${home}/.local/share/icons`, `${home}/.icons`, '/usr/share/icons'];
+    const names = new Set();
+    for (const d of dirs) {
+        let en;
+        try {
+            en = Gio.File.new_for_path(d).enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+        } catch (e) { continue; }
+        let info;
+        while ((info = en.next_file(null))) {
+            const n = info.get_name();
+            const p = `${d}/${n}`;
+            let ok = false;
+            if (kind === 'gtk3') {
+                ok = GLib.file_test(`${p}/gtk-3.0`, GLib.FileTest.IS_DIR);
+            } else if (kind === 'cursor') {
+                ok = GLib.file_test(`${p}/cursors`, GLib.FileTest.IS_DIR);
+            } else {
+                try {
+                    const kf = new GLib.KeyFile();
+                    kf.load_from_file(`${p}/index.theme`, GLib.KeyFileFlags.NONE);
+                    ok = kf.has_key('Icon Theme', 'Directories');
+                } catch (e) { ok = false; }
+            }
+            if (ok)
+                names.add(n);
+        }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+// ActionRow with a dropdown BUTTON (same look as the font buttons) bound to a string key of org.gnome.desktop.interface.
+function makeThemeButtonRow(title, settings, key, kind) {
+    const names = installedThemes(kind);
+    const current = settings.get_string(key);
+    if (!names.includes(current))
+        names.unshift(current);
+    const dd = new Gtk.DropDown({
+        model: Gtk.StringList.new(names),
+        valign: Gtk.Align.CENTER,
+        enable_search: names.length > 12,
+    });
+    dd.selected = names.indexOf(current);
+    dd.connect('notify::selected', () => {
+        const v = names[dd.selected];
+        if (v && v !== settings.get_string(key))
+            settings.set_string(key, v);
+    });
+    settings.connect(`changed::${key}`, () => {
+        const i = names.indexOf(settings.get_string(key));
+        if (i >= 0 && i !== dd.selected)
+            dd.selected = i;
+    });
+    const row = new Adw.ActionRow({ title });
+    row.add_suffix(dd);
+    row.activatable_widget = dd;
+    return row;
+}
+
+// Non-interactive subheading row for use INSIDE a group (libadwaita has no two-level headings).
+function makeSubheadingRow(text) {
+    const row = new Gtk.ListBoxRow({ activatable: false, selectable: false, focusable: false });
+    row.set_child(new Gtk.Label({
+        label: text, xalign: 0, css_classes: ['heading'],
+        margin_top: 12, margin_bottom: 6, margin_start: 12, margin_end: 12,
+    }));
+    return row;
+}
+
+// Knomadic shell/GTK4 theme as a dropdown button: 'Default' (empty theme-name) + every ~/.themes-style folder with gnome-shell/gnome-shell.css.
+function makeKnomadicThemeRow(title, settings) {
+    const values = [''];
+    const labels = [_('Default')];
+    const seen = new Set(['']);
+    for (const d of getThemeDirs()) {
+        let en;
+        try {
+            en = Gio.File.new_for_path(d).enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+        } catch (e) { continue; }
+        let info;
+        while ((info = en.next_file(null))) {
+            const n = info.get_name();
+            if (!seen.has(n) && GLib.file_test(`${d}/${n}/gnome-shell/gnome-shell.css`, GLib.FileTest.EXISTS)) {
+                seen.add(n);
+                values.push(n);
+                labels.push(n);
+            }
+        }
+    }
+    const current = settings.get_string('theme-name');
+    if (!values.includes(current)) {
+        values.push(current);
+        labels.push(current);
+    }
+    const dd = new Gtk.DropDown({ model: Gtk.StringList.new(labels), valign: Gtk.Align.CENTER });
+    dd.selected = values.indexOf(current);
+    dd.connect('notify::selected', () => {
+        const v = values[dd.selected];
+        if (v !== undefined && v !== settings.get_string('theme-name'))
+            settings.set_string('theme-name', v);
+    });
+    settings.connect('changed::theme-name', () => {
+        const i = values.indexOf(settings.get_string('theme-name'));
+        if (i >= 0 && i !== dd.selected)
+            dd.selected = i;
+    });
+    const row = new Adw.ActionRow({ title });
+    row.add_suffix(dd);
+    row.activatable_widget = dd;
+    return row;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shadow editor, layout ported from Rounded Window Corners Reborn (edit-shadow.ui / edit_shadow.ts): a card showing the desktop
+// wallpaper with a focused and an unfocused sample window (hover swaps their shadows), and one expander of sliders per shadow.
+// Our keys: <prefix>-shadow-{opacity 0-255,blur,spread,x-offset,y-offset}. Returns [previewGroup, slidersGroup].
+// ─────────────────────────────────────────────────────────────────────────────
+function makeShadowEditor(settings) {
+    const shadowCss = prefix => {
+        const g = k => settings.get_int(`${prefix}-shadow-${k}`);
+        return `box-shadow: ${g('x-offset')}px ${g('y-offset')}px ${g('blur')}px ${g('spread')}px `
+            + `rgba(0,0,0,${(g('opacity') / 255).toFixed(3)})`;
+    };
+    const addCss = (widget, provider) =>
+        widget.get_style_context().add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+
+    // preview card: wallpaper background + two sample windows
+    const card = new Gtk.Box({ css_classes: ['card', 'desktop-background'] });
+    const inner = new Gtk.Box({ halign: Gtk.Align.CENTER, hexpand: true });
+    card.append(inner);
+    const mkPreview = label => new Gtk.Label({
+        label, width_request: 170, height_request: 170,
+        margin_top: 24, margin_bottom: 24, margin_start: 24, margin_end: 24,
+        css_classes: ['background', 'preview'],
+    });
+    const focusedPreview = mkPreview(_('Focused window'));
+    const unfocusedPreview = mkPreview(_('Unfocused window'));
+    inner.append(focusedPreview);
+    inner.append(unfocusedPreview);
+
+    const focusProv = new Gtk.CssProvider();
+    const unfocusProv = new Gtk.CssProvider();
+    const bgProv = new Gtk.CssProvider();
+    addCss(focusedPreview, focusProv);
+    addCss(unfocusedPreview, unfocusProv);
+    addCss(card, bgProv);
+
+    const refreshBackground = () => {
+        const bg = new Gio.Settings({ schema_id: 'org.gnome.desktop.background' });
+        const dark = Adw.StyleManager.get_default().dark;
+        const uri = bg.get_string(dark ? 'picture-uri-dark' : 'picture-uri');
+        const css = (uri && uri !== 'none')
+            ? `.desktop-background { background: url("${uri}"); background-size: cover; }`
+            : `.desktop-background { background-color: ${bg.get_string('primary-color') || '#282a36'}; }`;
+        bgProv.load_from_string(css);
+    };
+    const refreshShadows = () => {
+        const f = shadowCss('focused'), u = shadowCss('unfocused');
+        focusProv.load_from_string(`.preview { transition: box-shadow 200ms; ${f}; border-radius: 15px; } .preview:hover { ${u}; }`);
+        unfocusProv.load_from_string(`.preview { transition: box-shadow 200ms; ${u}; border-radius: 15px; } .preview:hover { ${f}; }`);
+    };
+    refreshBackground();
+    refreshShadows();
+    Adw.StyleManager.get_default().connect('notify::dark', refreshBackground);
+
+    const previewGroup = new Adw.PreferencesGroup();
+    previewGroup.add(card);
+
+    const slidersGroup = new Adw.PreferencesGroup();
+    for (const [prefix, title] of [['focused', _('Focused shadow preferences')], ['unfocused', _('Unfocused shadow preferences')]]) {
+        const exp = new Adw.ExpanderRow({ title });
+        for (const [k, label, lo, hi] of [
+            ['x-offset', _('Horizontal offset'), -100, 100],
+            ['y-offset', _('Vertical offset'), -100, 100],
+            ['blur', _('Blur radius'), 0, 120],
+            ['spread', _('Spread radius'), -50, 50],
+            ['opacity', _('Opacity'), 0, 255],
+        ]) {
+            const key = `${prefix}-shadow-${k}`;
+            const adj = new Gtk.Adjustment({ lower: lo, upper: hi, step_increment: 1, page_increment: 5 });
+            const scale = new Gtk.Scale({
+                adjustment: adj, orientation: Gtk.Orientation.HORIZONTAL, hexpand: true, valign: Gtk.Align.CENTER,
+                draw_value: true, round_digits: 0, value_pos: Gtk.PositionType.LEFT, width_request: 300,
+            });
+            const def = settings.get_default_value(key).get_int32();   // mark = the schema default, like Reborn
+            scale.add_mark(def, Gtk.PositionType.BOTTOM, String(def));
+            bindAdjInt(settings, key, adj);
+            settings.connect(`changed::${key}`, refreshShadows);
+            const row = new Adw.ActionRow({ title: label });
+            row.add_suffix(scale);
+            exp.add_row(row);
+        }
+        slidersGroup.add(exp);
+    }
+    return [previewGroup, slidersGroup];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main preferences class
+// ─────────────────────────────────────────────────────────────────────────────
+export default class RoundedWindowsPreferences extends ExtensionPreferences {
+
+    fillPreferencesWindow(win) {
+        const settings = this.getSettings();
+        // Wide enough for the page switcher to sit in the title bar; as tall as the screen minus 24px (2 x the 12px window gaps; the
+        // dock and top bar autohide). NOT fullscreen/maximized - the desktop stays visible around it.
+        // Width: 743 (728 broke: pages moved to the bottom bar; 766 was fine; 1240 -20% -10% -5% -5% -5% -5% then +2%, each of the previous, 2026-10-09; only 5 pages now, text-only tabs); capped to the screen.
+        let prefsHeight = 720;
+        let prefsWidth = 743;
+        try {
+            const monitors = Gdk.Display.get_default().get_monitors();
+            const geo = monitors.get_item(0).get_geometry();
+            prefsHeight = Math.max(560, geo.height - 24);
+            prefsWidth = Math.min(prefsWidth, geo.width - 24);
+        } catch (e) { /* keep the fallbacks */ }
+        win.set_default_size(prefsWidth, prefsHeight);
+
+        // ── Page: Menu Bar (merged from Dash to Panel; logic lives in topbar/) ─
+        const topPage = new Adw.PreferencesPage({
+            title:     _('Menu Bar'),
+        });
+
+        const topMainGroup = new Adw.PreferencesGroup({
+            title:       _('Menu Bar'),
+        });
+        topPage.add(topMainGroup);
+        const topEnableRow = new Adw.SwitchRow({ title: _('Customize Menu Bar') });
+        bindBool(settings, 'topbar-enabled', topEnableRow);
+        topMainGroup.add(topEnableRow);
+
+        // -- Intellihide --
+        const ihGroup = new Adw.PreferencesGroup({ title: _('Intellihide') });
+        topPage.add(ihGroup);
+        const ihSwitch = new Adw.SwitchRow({
+            title:    _('Intellihide'),
+        });
+        bindBool(settings, 'topbar-intellihide', ihSwitch);
+        ihGroup.add(ihSwitch);
+
+        const ihOpts = new Adw.ExpanderRow({ title: _('Intellihide options') });
+        ihGroup.add(ihOpts);
+
+        const behaviours = ['ALL_WINDOWS', 'FOCUSED_WINDOWS', 'MAXIMIZED_WINDOWS'];
+        const behRow = new Adw.ComboRow({
+            title: _('Hide for'),
+            model: Gtk.StringList.new([_('All windows'), _('Focused window'), _('Maximized windows')]),
+        });
+        behRow.selected = Math.max(0, behaviours.indexOf(settings.get_string('topbar-intellihide-behaviour')));
+        behRow.connect('notify::selected', () =>
+            settings.set_string('topbar-intellihide-behaviour', behaviours[behRow.selected]));
+        ihOpts.add_row(behRow);
+
+        const ihToggles = [
+            ['topbar-intellihide-hide-from-windows', _('Only hide when windows overlap the bar')],
+            ['topbar-intellihide-hide-from-monitor-windows', _('Hide for any window on the monitor')],
+            ['topbar-intellihide-use-pointer', _('Reveal at the screen edge')],
+            ['topbar-intellihide-use-pressure', _('Require pressure on the edge')],
+            ['topbar-intellihide-revealed-hover', _('Stay revealed while hovered')],
+            ['topbar-intellihide-show-in-fullscreen', _('Allow revealing in fullscreen')],
+            ['topbar-intellihide-show-on-notification', _('Reveal on notification')],
+        ];
+        for (const [key, title] of ihToggles) {
+            const r = new Adw.SwitchRow({ title });
+            bindBool(settings, key, r);
+            ihOpts.add_row(r);
+        }
+
+        const ihSpins = [
+            ['topbar-intellihide-animation-time', _('Animation time (ms)'), 0, 2000, 10],
+            ['topbar-intellihide-close-delay', _('Hide delay after leaving (ms)'), 0, 5000, 50],
+            ['topbar-intellihide-reveal-delay', _('Reveal delay (ms)'), 0, 5000, 50],
+            ['topbar-intellihide-enable-start-delay', _('Start delay after login (ms)'), 0, 10000, 100],
+            ['topbar-intellihide-pressure-threshold', _('Pressure threshold'), 1, 2000, 10],
+            ['topbar-intellihide-pressure-time', _('Pressure time window (ms)'), 1, 5000, 50],
+        ];
+        for (const [key, title, lo, hi, step] of ihSpins) {
+            const { row, adj } = makeSpinRow(title, lo, hi, step);
+            bindAdjInt(settings, key, adj);
+            ihOpts.add_row(row);
+        }
+
+        const keyRow = new Adw.ActionRow({ title: _('Reveal / release shortcut') });
+        keyRow.add_suffix(new Gtk.Label({
+            label:  settings.get_strv('topbar-intellihide-key-toggle').join(', ') || _('(none)'),
+            valign: Gtk.Align.CENTER,
+        }));
+        ihOpts.add_row(keyRow);
+
+        // -- Quick Settings / Date Menu layout (runtime: qs/quickSettings.js) --
+        const qsGroup = addQsLayoutGroups(topPage, settings, win);
+
+        // -- Appearance --
+        const lookGroup = new Adw.PreferencesGroup({ title: _('Appearance') });
+        topPage.add(lookGroup);
+        lookGroup.add(makeColorPickRow(
+            _('Color'), '0d0d0f', 'set-topbar-color.sh'));
+
+        const opaSpin = makeSpinRow(_('Opacity (%)'), 0, 100, 1);
+        opaSpin.adj.value = Math.round(settings.get_double('topbar-opacity') * 100);
+        opaSpin.adj.connect('value-changed', a => settings.set_double('topbar-opacity', a.value / 100));
+        lookGroup.add(opaSpin.row);
+
+        const sizeSpin = makeSpinRow(_('Thickness (px)'), 22, 64, 1);
+        bindAdjInt(settings, 'topbar-size', sizeSpin.adj);
+        lookGroup.add(sizeSpin.row);
+
+        const trayRow = makeSpinRow(_('Font size (px)'), 0, 64, 1);
+        bindAdjInt(settings, 'topbar-tray-size', trayRow.adj);
+        lookGroup.add(trayRow.row);
+
+        // Quick Settings colours go into the Quick Settings group, below 'Hide date menu left box'
+        qsGroup.add(makeColorPickRow(_('QS Background'), '222226', 'set-shell-color.sh', ['qs-background']));
+        qsGroup.add(makeColorPickRow(_('QS Buttons'), '48484b', 'set-shell-color.sh', ['qs-buttons']));
+        qsGroup.add(makeColorPickRow(_('QS Widgets'), '36363a', 'set-shell-color.sh', ['qs-widgets']));
+        qsGroup.add(makeColorPickRow(_('QS Inactive'), '48484b', 'set-shell-color.sh', ['qs-inactive']));
+
+        const calGroup = new Adw.PreferencesGroup({ title: _('Calendar Colors') });
+        topPage.add(calGroup);
+        calGroup.add(makeColorPickRow(_('Calendar Background'), '222226', 'set-shell-color.sh', ['calendar-background']));
+        calGroup.add(makeColorPickRow(_('Calendar Buttons'), '36363a', 'set-shell-color.sh', ['calendar-buttons']));
+        calGroup.add(makeColorPickRow(_('Calendar Headers'), '36363a', 'set-shell-color.sh', ['calendar-headers']));
+        calGroup.add(makeColorPickRow(_('Calendar Banners'), '47474c', 'set-shell-color.sh', ['calendar-banners']));
+
+        // ── Page: Interface (system behaviour / UI; plain dconf rows, formerly GNOME Tweaks) ──
+        const ifaceSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.interface' });
+        const inputSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.input-sources' });
+        const ifacePage = new Adw.PreferencesPage({
+            title:     _('Interface'),
+        });
+
+        // Interface page, top down: Fonts | Theme (GTK4 / Adwaita, GTK3) | Icons | Cursor | Colors (Shell, Applications) | Keyboard.
+        // Groups are created here and added in that order near the end of fillPreferencesWindow.
+        const fontGroup = new Adw.PreferencesGroup({ title: _('Fonts') });
+        for (const [key, title] of [
+            ['font-name', _('Interface')],
+            ['monospace-font-name', _('Monospace')],
+        ]) {
+            const btn = new Gtk.FontDialogButton({
+                dialog: new Gtk.FontDialog(),
+                valign: Gtk.Align.CENTER,
+                level:  Gtk.FontLevel.FONT,
+            });
+            const fromSetting = () => Pango.FontDescription.from_string(ifaceSettings.get_string(key));
+            btn.font_desc = fromSetting();
+            btn.connect('notify::font-desc', b => {
+                const s = b.font_desc.to_string();
+                if (s !== ifaceSettings.get_string(key))
+                    ifaceSettings.set_string(key, s);
+            });
+            ifaceSettings.connect(`changed::${key}`, () => { btn.font_desc = fromSetting(); });
+            const row = new Adw.ActionRow({ title });
+            row.add_suffix(btn);
+            row.activatable_widget = btn;
+            fontGroup.add(row);
+        }
+        const scaleRow = makeSpinRow(_('Scaling'), 0.5, 3, 0.05, 2);
+        bindAdjDbl(ifaceSettings, 'text-scaling-factor', scaleRow.adj);
+        fontGroup.add(scaleRow.row);
+
+        const themeGroup = new Adw.PreferencesGroup({ title: _('Theme') });
+        themeGroup.add(makeKnomadicThemeRow(_('GTK4 / Adwaita'), settings));
+        themeGroup.add(makeThemeButtonRow(_('GTK3'), ifaceSettings, 'gtk-theme', 'gtk3'));
+        themeGroup.add(makeThemeButtonRow(_('Icons'), ifaceSettings, 'icon-theme', 'icons'));
+        themeGroup.add(makeThemeButtonRow(_('Cursor'), ifaceSettings, 'cursor-theme', 'cursor'));
+
+        // Shell Colors and Application Colors are two groups; shellGroup / systemGroup
+        // below alias them so the existing colour-row code is unchanged.
+        const colorsGroup = new Adw.PreferencesGroup({ title: _('Shell Colors') });
+        const appColorsGroup = new Adw.PreferencesGroup({ title: _('Application Colors') });
+
+        const kbRow = new Adw.ActionRow({ title: _('Keyboard Layout Options'), activatable: true });
+        kbRow.add_suffix(new Gtk.Image({ icon_name: 'go-next-symbolic' }));
+        kbRow.connect('activated', () => this._openXkbOptions(win, inputSettings));
+        fontGroup.add(kbRow);   // under Fonts, below Scaling (user request)
+
+        // ── Page: Dash (stub) ────────────────────────────────────────────────
+        const dashPage = new Adw.PreferencesPage({
+            title:     _('Dash'),
+        });
+        const dashGroup = new Adw.PreferencesGroup({ title: _('Dash') });
+        dashPage.add(dashGroup);
+        dashGroup.add(new Adw.ActionRow({ title: _('Coming soon'), css_classes: ['dim-label'] }));
+
+        // ── Page 2: Colors ───────────────────────────────────────────────────
+        // Shell rows -> set-shell-*.sh (Adwaita-custom gnome-shell.css + GDM); System rows -> machine-setup scripts.
+        // "Dolphin Main View" (dolphin-view-color.sh) also sets the Dolphin status bar and path bar.
+        // Smplayer rows -> qt5ct-palette-color.sh <role> (SMPlayer's own qt5ct palette; roles confirmed 2026-09-29).
+        const colorsPage = new Adw.PreferencesPage({
+            title:     _('Theme'),
+        });
+
+        // Theme page: stub for now (everything that was here moved to Interface)
+        const themeStubGroup = new Adw.PreferencesGroup({ title: _('Theme') });
+        colorsPage.add(themeStubGroup);
+        themeStubGroup.add(new Adw.ActionRow({ title: _('Coming soon'), css_classes: ['dim-label'] }));
+
+        const shellGroup = colorsGroup;
+        shellGroup.add(makeColorPickRow(_('Accent'), '583d80', 'set-shell-accent-color.sh'));
+        shellGroup.add(makeColorPickRow(_('Overview / GDM Background'), '212125', 'set-shell-background-color.sh'));
+
+        const systemGroup = appColorsGroup;
+        systemGroup.add(makeColorPickRow(_('Titlebar'), '1b1b1d', 'set-titlebar-color.sh'));
+        systemGroup.add(makeColorPickRow(_('GTK / QT Accent'), '623e8b', 'set-accent-color.sh'));
+        systemGroup.add(makeColorPickRow(_('Dark Application Background'), '1b1b1d', 'master_black_background.sh'));
+        systemGroup.add(makeColorPickRow(_('Light Application Background'), '3f3f46', 'grey_foreground.sh'));
+        systemGroup.add(makeColorPickRow(_('Dolphin Sidebar'), '383840', 'dolphin-sideview-color.sh'));
+        systemGroup.add(makeColorPickRow(_('Dolphin Main View'), '1c1c20', 'dolphin-view-color.sh'));
+        systemGroup.add(makeColorPickRow(_('Text Editor Titlebar'), '1f1f24', 'set-text-editor-titlebar-color.sh'));
+        systemGroup.add(makeColorPickRow(_('Text Editor Background'), '1f1f24', 'set-text-editor-bg-color.sh'));
+        systemGroup.add(makeColorPickRow(_('Smplayer Background'), '3f3f46', 'qt5ct-palette-color.sh', ['window']));
+        systemGroup.add(makeColorPickRow(_('Smplayer Playlist'), '1b1b1d', 'qt5ct-palette-color.sh', ['base']));
+        systemGroup.add(makeColorPickRow(_('Smplayer Highlight'), '3d3352', 'qt5ct-palette-color.sh', ['highlight']));
+        systemGroup.add(makeColorPickRow(_('Smplayer Buttons'), '1b1b1d', 'qt5ct-palette-color.sh', ['button']));
+        systemGroup.add(makeColorPickRow(_('Smplayer Text'), 'f5f5f5', 'qt5ct-palette-color.sh', ['window-text']));
+        systemGroup.add(makeColorPickRow(_('Smplayer Playlist Text'), '0000ff', 'qt5ct-palette-color.sh', ['link']));
+        systemGroup.add(makeColorPickRow(_('Smplayer Selected Text'), 'f5f5f5', 'qt5ct-palette-color.sh', ['highlighted-text']));
+
+        // ── Page 3: Borders (Corners, then Shadow) ─────────────────────────────────────────────────
+        const cornersPage = new Adw.PreferencesPage({
+            title: _('Windows'),
+        });
+
+        // ── Group: Gestures (stub; will link to the relevant keyboard shortcuts) ──
+        const gestGroup = new Adw.PreferencesGroup({ title: _('Gestures') });
+        cornersPage.add(gestGroup);
+        gestGroup.add(new Adw.ActionRow({ title: _('Coming soon'), css_classes: ['dim-label'] }));
+
+        // ── Group: Corner shape ──────────────────────────────────────────────
+        const shapeGroup = new Adw.PreferencesGroup({
+            title:       _('Corner shape'),
+        });
+        cornersPage.add(shapeGroup);
+
+        // Radius
+        const radiusRow = makeSpinRow(_('Radius'), 1, 50, 1);
+        bindAdjInt(settings, 'corner-radius', radiusRow.adj);
+        shapeGroup.add(radiusRow.row);
+
+        // Smoothing (squircle)
+        const smoothRow = makeSpinRow(_('Smoothing'), 0, 1, 0.05, 2);
+        bindAdjDbl(settings, 'smoothing', smoothRow.adj);
+        shapeGroup.add(smoothRow.row);
+
+        // ── Group: Padding ───────────────────────────────────────────────────
+        const padGroup = new Adw.PreferencesGroup({
+            title:       _('Clip padding'),
+        });
+        cornersPage.add(padGroup);
+
+        for (const [side, key] of [
+            [_('Top'),    'padding-top'],
+            [_('Bottom'), 'padding-bottom'],
+            [_('Left'),   'padding-left'],
+            [_('Right'),  'padding-right'],
+        ]) {
+            const r = makeSpinRow(side, 0, 100, 1);
+            bindAdjInt(settings, key, r.adj);
+            padGroup.add(r.row);
+        }
+
+        // ── Group: Border ────────────────────────────────────────────────────
+        const borderGroup = new Adw.PreferencesGroup({
+            title:       _('Border'),
+        });
+        cornersPage.add(borderGroup);
+
+        const bwRow = makeSpinRow(_('Width'), -15, 15, 1);
+        bindAdjInt(settings, 'border-width', bwRow.adj);
+        borderGroup.add(bwRow.row);
+
+        // Border colour: kcolorchooser (like every other colour row). It returns opaque RGB, so the existing alpha is kept.
+        const colorRow = new Adw.ActionRow({ title: _('Colour') });
+        const toHex = () => ['border-red', 'border-green', 'border-blue']
+            .map(k => Math.round(settings.get_double(k) * 255).toString(16).padStart(2, '0')).join('');
+        const colorSwatch = makeColorSwatch(toHex());
+        const colorStatus = new Gtk.Label({ label: '', xalign: 1, valign: Gtk.Align.CENTER, css_classes: ['dim-label'] });
+        const colorBtn = new Gtk.Button({ label: _('Pick…'), valign: Gtk.Align.CENTER });
+        for (const k of ['border-red', 'border-green', 'border-blue'])
+            settings.connect(`changed::${k}`, () => updateSwatchColor(colorSwatch, toHex()));
+        colorBtn.connect('clicked', () => {
+            try {
+                const picker = Gio.Subprocess.new(
+                    ['kcolorchooser', ...KCOLOR_QSS, '--print', '--color', `#${toHex()}`],
+                    Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+                picker.communicate_utf8_async(null, null, (p, res) => {
+                    let stdout;
+                    try {
+                        [, stdout] = p.communicate_utf8_finish(res);
+                    } catch (e) {
+                        colorStatus.label = `${_('Error')}: ${e.message}`;
+                        return;
+                    }
+                    const hex = parseKColorChooserOutput(stdout);
+                    if (!p.get_successful() || !hex) {
+                        colorStatus.label = _('Cancelled');
+                        return;
+                    }
+                    settings.set_double('border-red',   parseInt(hex.slice(0, 2), 16) / 255);
+                    settings.set_double('border-green', parseInt(hex.slice(2, 4), 16) / 255);
+                    settings.set_double('border-blue',  parseInt(hex.slice(4, 6), 16) / 255);
+                    colorStatus.label = `${_('Applied')} #${hex}`;
+                });
+            } catch (e) {
+                colorStatus.label = `${_('Error')}: ${e.message}`;
+            }
+        });
+        colorRow.add_suffix(colorSwatch);
+        colorRow.add_suffix(colorStatus);
+        colorRow.add_suffix(colorBtn);
+        colorRow.activatable_widget = colorBtn;
+        borderGroup.add(colorRow);
+
+        // ── Group: Behaviour ─────────────────────────────────────────────────
+        const behGroup = new Adw.PreferencesGroup({ title: _('Behaviour') });
+        cornersPage.add(behGroup);
+
+        const maxRow  = new Adw.SwitchRow({
+            title:    _('Keep rounded when maximised'),
+        });
+        bindBool(settings, 'keep-rounded-maximized', maxRow);
+        behGroup.add(maxRow);
+
+        const fullRow = new Adw.SwitchRow({
+            title:    _('Keep rounded when full-screen'),
+        });
+        bindBool(settings, 'keep-rounded-fullscreen', fullRow);
+        behGroup.add(fullRow);
+
+        // ── Shadow (below the corners) ──
+        // Enable / disable custom shadow
+        const shadowToggleGroup = new Adw.PreferencesGroup({ title: _('Shadow') });
+        cornersPage.add(shadowToggleGroup);
+
+        const shadowRow = new Adw.SwitchRow({
+            title:    _('Custom shadow'),
+        });
+        bindBool(settings, 'custom-shadow', shadowRow);
+        shadowToggleGroup.add(shadowRow);
+
+        const keepShadowRow = new Adw.SwitchRow({
+            title:    _('Shadow when maximised'),
+        });
+        bindBool(settings, 'keep-shadow-maximized', keepShadowRow);
+        shadowToggleGroup.add(keepShadowRow);
+
+        // Focused / unfocused shadow settings
+        const [shadowPreviewGroup, shadowSlidersGroup] = makeShadowEditor(settings);
+        cornersPage.add(shadowPreviewGroup);
+        cornersPage.add(shadowSlidersGroup);
+
+        // ── Window Gap (merged from window-gap@blank.local; logic in gap/) ──
+        const gapGroup = new Adw.PreferencesGroup({ title: _('Window Gap') });
+        cornersPage.add(gapGroup);
+
+        const gapUniformRow = new Adw.SwitchRow({ title: _('Same gap on all edges') });
+        bindBool(settings, 'windowgap-uniform', gapUniformRow);
+        gapGroup.add(gapUniformRow);
+
+        const gapSizeRow = makeSpinRow(_('Gap size (px)'), 0, 200, 1);
+        bindAdjInt(settings, 'windowgap-gap-size', gapSizeRow.adj);
+        settings.bind('windowgap-uniform', gapSizeRow.row, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
+        gapGroup.add(gapSizeRow.row);
+
+        const gapFullRow = new Adw.SwitchRow({ title: _('No gap for fullscreen windows') });
+        bindBool(settings, 'windowgap-no-gap-fullscreen', gapFullRow);
+        gapGroup.add(gapFullRow);
+
+        const edgeGroup = new Adw.PreferencesGroup({ title: _('Per-edge margins') });
+        settings.bind('windowgap-uniform', edgeGroup, 'sensitive', Gio.SettingsBindFlags.INVERT_BOOLEAN);
+        cornersPage.add(edgeGroup);
+        for (const [key, title] of [
+            ['windowgap-margin-top', _('Top')],
+            ['windowgap-margin-bottom', _('Bottom')],
+            ['windowgap-margin-left', _('Left')],
+            ['windowgap-margin-right', _('Right')],
+        ]) {
+            const edge = makeSpinRow(title, 0, 200, 1);
+            bindAdjInt(settings, key, edge.adj);
+            edgeGroup.add(edge.row);
+        }
+
+        // Windows page order, Behaviour first: Gestures, Window Gap (+ per-edge), Behaviour, then Look: Corner shape, Clip padding, Border, Shadow
+        const winOrder = [gestGroup, gapGroup, edgeGroup, behGroup, shapeGroup, padGroup, borderGroup,
+            shadowToggleGroup, shadowPreviewGroup, shadowSlidersGroup];
+        for (const g of winOrder)
+            cornersPage.remove(g);
+        for (const g of winOrder)
+            cornersPage.add(g);
+        // Page order
+        for (const g of [fontGroup, themeGroup, colorsGroup, appColorsGroup])
+            ifacePage.add(g);
+        // Menu Bar page order: master toggle, Appearance, Intellihide, Calendar, Quick Settings (+ its colours)
+        for (const g of [topMainGroup, lookGroup, ihGroup, calGroup, qsGroup])
+            topPage.remove(g);
+        for (const g of [topMainGroup, lookGroup, ihGroup, calGroup, qsGroup])
+            topPage.add(g);
+        for (const pg of [topPage, ifacePage, cornersPage, colorsPage, dashPage])
+            win.add(pg);
+        hideViewSwitcherIcons(win);
+        GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => { hideViewSwitcherIcons(win); return GLib.SOURCE_REMOVE; });
+        win.connect('map', () => hideViewSwitcherIcons(win));
+    }
+
+    // Same structure as GNOME Tweaks' "Additional Layout Options": one expander per XKB option group.
+    // Single-choice groups (caps, altwin, ...) get a Default + radio list; the rest get independent checks.
+    _openXkbOptions(parent, inputSettings) {
+        const info = new GnomeDesktop.XkbInfo();
+        const SINGLE = new Set(['keypad', 'kpdl', 'caps', 'altwin', 'nbsp', 'esperanto']);
+        const BLACKLIST = new Set(['grp_led', 'Compose key']);
+        const dlg = new Adw.Window({
+            title: _('Keyboard Layout Options'), transient_for: parent, modal: true,
+            default_width: 560, default_height: 700,
+        });
+        const page = new Adw.PreferencesPage();
+        const group = new Adw.PreferencesGroup();
+        page.add(group);
+        const view = new Adw.ToolbarView({ content: page });
+        view.add_top_bar(new Adw.HeaderBar());
+        dlg.set_content(view);
+
+        const get = () => inputSettings.get_strv('xkb-options');
+        const setOpt = (id, on, groupOpts) => {
+            const cur = get().filter(o => !groupOpts.includes(o));
+            if (on && id) cur.push(id);
+            inputSettings.set_strv('xkb-options', cur);
+        };
+        const groups = info.get_all_option_groups()
+            .filter(g => !BLACKLIST.has(g))
+            .map(g => [g, info.description_for_group(g) ?? g])
+            .sort((x, y) => x[1].localeCompare(y[1]));
+        for (const [gid, gdesc] of groups) {
+            const opts = info.get_options_for_group(gid);
+            const exp = new Adw.ExpanderRow({ title: gdesc });
+            const single = SINGLE.has(gid);
+            let first = null;
+            const entries = single ? [[null, _('Default')]] : [];
+            for (const o of opts) entries.push([o, info.description_for_option(gid, o) ?? o]);
+            const checks = [];
+            for (const [id, desc] of entries) {
+                const row = new Adw.ActionRow({ title: desc });
+                const chk = new Gtk.CheckButton({ valign: Gtk.Align.CENTER });
+                if (single) {
+                    if (first) chk.group = first; else first = chk;
+                    chk.active = id ? get().includes(id) : !opts.some(o => get().includes(o));
+                } else {
+                    chk.active = get().includes(id);
+                }
+                chk.connect('toggled', c => {
+                    if (single) { if (c.active) setOpt(id, true, opts); }
+                    else setOpt(id, c.active, [id]);
+                });
+                row.add_prefix(chk);
+                row.activatable_widget = chk;
+                exp.add_row(row);
+                checks.push([id, chk]);
+            }
+            group.add(exp);
+        }
+        dlg.present();
+    }
+
+}

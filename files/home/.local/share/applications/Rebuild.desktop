@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Rebuild
+Comment=Run rebuild script
+Exec=bash -c "sudo bash /home/blank/Software/asahi_atomic/rebuild-golden-b.sh; echo; read -p Done-press-Enter x"
+Icon=org.gnome.tweaks.svg
+Terminal=true
+Categories=Utility;

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Terminal=false
+Type=Application
+Name=Jellyfin
+Exec=/opt/brave.com/brave/brave-browser --profile-directory=Default --app-id=khpkaecihdamjemicinomnellcjpocka
+Icon=brave-khpkaecihdamjemicinomnellcjpocka-Default
+NoDisplay=true
+StartupWMClass=crx_khpkaecihdamjemicinomnellcjpocka

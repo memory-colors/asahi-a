@@ -1,0 +1,13 @@
+[Desktop Entry]
+Comment=
+Exec=/home/blank/.local/bin/losslesscut
+Icon=vidcutter
+Name=LosslessCut
+NoDisplay=false
+Path=
+StartupNotify=true
+Terminal=false
+TerminalOptions=
+Type=Application
+X-KDE-SubstituteUID=false
+X-KDE-Username=

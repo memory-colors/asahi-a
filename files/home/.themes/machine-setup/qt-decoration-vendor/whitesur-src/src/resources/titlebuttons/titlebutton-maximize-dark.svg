@@ -1,0 +1,38 @@
+<svg width="16" height="16" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="clip-maximize-normal">
+      <circle cx="8" cy="8" r="7"/>
+    </clipPath>
+    <!-- Main body: vertical gradient from pixel samples -->
+    <linearGradient id="body-maximize-normal" x1="8" y1="1" x2="8" y2="15" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38c200"/>
+      <stop offset="15%" stop-color="#18c000"/>
+      <stop offset="25%" stop-color="#00bc00"/>
+      <stop offset="50%" stop-color="#20bf00"/>
+      <stop offset="68%" stop-color="#3dc120"/>
+      <stop offset="80%" stop-color="#50c438"/>
+      <stop offset="100%" stop-color="#50c438"/>
+    </linearGradient>
+    <!-- Top specular spot: bright highlight at top of sphere -->
+    <radialGradient id="st-maximize-normal" cx="8" cy="2.0" r="3.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#aef88d"/>
+      <stop offset="45%"  stop-color="#80ef64" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#80ef64" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Bottom specular spot: subtle secondary highlight -->
+    <radialGradient id="sb-maximize-normal" cx="8" cy="13.5" r="2.8" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#79ec65" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#79ec65" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Invisible bounding rect (matches original SVG convention) -->
+  <rect width="16" height="16" opacity="0"/>
+  <!-- Main body -->
+  <circle cx="8" cy="8" r="7" fill="url(#body-maximize-normal)"/>
+  <!-- Top specular overlay (clipped to circle) -->
+  <rect x="1" y="1" width="14" height="7" fill="url(#st-maximize-normal)" clip-path="url(#clip-maximize-normal)"/>
+  <!-- Bottom specular overlay (clipped to circle) -->
+  <rect x="1" y="8" width="14" height="7" fill="url(#sb-maximize-normal)" clip-path="url(#clip-maximize-normal)"/>
+  <!-- Icon overlay for hover/active states -->
+  
+</svg>

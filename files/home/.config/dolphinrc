@@ -1,0 +1,65 @@
+[ContentDisplay]
+DirectorySizeMode=ContentSize
+UseShortRelativeDates=false
+
+[ContextMenu]
+ShowAddToPlaces=false
+ShowCopyToOtherSplitView=false
+ShowDuplicateHere=false
+ShowMoveToOtherSplitView=false
+ShowOpenInNewTab=false
+ShowOpenInSplitView=false
+ShowSortBy=false
+ShowViewMode=false
+
+[DetailsMode]
+IconSize=22
+LeftPadding=0
+PreviewSize=22
+RightPadding=0
+
+[General]
+CloseActiveSplitView=false
+CloseSplitViewChoice=InactiveView
+HideXTrashFile=true
+RememberOpenedTabs=false
+ShowFullPathInTitlebar=true
+ShowSelectionToggle=false
+ShowStatusBar=FullWidth
+ShowZoomSlider=true
+SortingChoice=CaseInsensitiveSorting
+UseTabForSwitchingSplitView=true
+Version=202
+ViewPropsTimestamp=2025,7,25,0,42,10.92
+shadeSortColumn=false
+
+[Icons]
+Theme=MacTahoe-nord-dark
+
+[IconsMode]
+IconSize=96
+MaximumTextLines=2
+PreviewSize=80
+TextWidthIndex=0
+
+[InformationPanel]
+previewsShown=false
+
+[KFileDialog Settings]
+Places Icons Auto-resize=false
+Places Icons Static Size=22
+
+[MainWindow]
+MenuBar=Disabled
+
+[MainWindow][Toolbar mainToolBar]
+IconSize=16
+
+[PreviewSettings]
+Plugins=exrthumbnail,imagethumbnail,glycin-image-rs,jpegthumbnail,glycin-jxl,kraorathumbnail,windowsimagethumbnail,glycin-svg,svgthumbnail
+
+[Toolbar mainToolBar]
+IconSize=16
+
+[UiSettings]
+ColorScheme=bluegrey

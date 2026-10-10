@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.knomadic"
+          path="/org.gnome.shell.extensions.knomadic/">
+
+    <!-- ── Core corner settings ────────────────────────────────────────── -->
+    <key name="corner-radius" type="i">
+      <range min="1" max="50"/>
+      <default>12</default>
+      <summary>Corner radius in pixels</summary>
+    </key>
+
+    <key name="smoothing" type="d">
+      <range min="0.0" max="1.0"/>
+      <default>0.6</default>
+      <summary>Squircle smoothing (0 = circle, 1 = squircle)</summary>
+    </key>
+
+    <!-- ── Padding ─────────────────────────────────────────────────────── -->
+    <key name="padding-top" type="i">
+      <range min="0" max="100"/>
+      <default>1</default>
+    </key>
+    <key name="padding-bottom" type="i">
+      <range min="0" max="100"/>
+      <default>1</default>
+    </key>
+    <key name="padding-left" type="i">
+      <range min="0" max="100"/>
+      <default>1</default>
+    </key>
+    <key name="padding-right" type="i">
+      <range min="0" max="100"/>
+      <default>1</default>
+    </key>
+
+    <!-- ── Application filtering ───────────────────────────────────────── -->
+    <key name="skip-libadwaita-app" type="b">
+      <default>false</default>
+      <summary>Skip libadwaita apps (already have native rounded corners)</summary>
+    </key>
+    <key name="skip-libhandy-app" type="b">
+      <default>false</default>
+      <summary>Skip libhandy apps</summary>
+    </key>
+
+    <!-- ── Blacklist / whitelist ───────────────────────────────────────── -->
+    <key name="blacklist" type="as">
+      <default>[]</default>
+      <summary>List of app WM class names to skip (or allow if whitelist-mode)</summary>
+    </key>
+    <key name="whitelist-mode" type="b">
+      <default>false</default>
+      <summary>Treat the blacklist as a whitelist</summary>
+    </key>
+
+    <!-- ── Border ──────────────────────────────────────────────────────── -->
+    <key name="border-width" type="i">
+      <range min="-15" max="15"/>
+      <default>0</default>
+      <summary>Border width (positive = inner, negative = outer, 0 = none)</summary>
+    </key>
+    <key name="border-red" type="d">
+      <range min="0.0" max="1.0"/>
+      <default>0.8</default>
+    </key>
+    <key name="border-green" type="d">
+      <range min="0.0" max="1.0"/>
+      <default>0.8</default>
+    </key>
+    <key name="border-blue" type="d">
+      <range min="0.0" max="1.0"/>
+      <default>0.85</default>
+    </key>
+    <key name="border-alpha" type="d">
+      <range min="0.0" max="1.0"/>
+      <default>1.0</default>
+    </key>
+
+    <!-- ── Behaviour ───────────────────────────────────────────────────── -->
+    <key name="keep-rounded-maximized" type="b">
+      <default>false</default>
+      <summary>Keep rounded corners when a window is maximized</summary>
+    </key>
+    <key name="keep-rounded-fullscreen" type="b">
+      <default>false</default>
+      <summary>Keep rounded corners when a window is full-screen</summary>
+    </key>
+
+    <!-- ── Custom shadow ───────────────────────────────────────────────── -->
+    <key name="custom-shadow" type="b">
+      <default>true</default>
+      <summary>Replace the default rectangular shadow with a rounded one</summary>
+    </key>
+    <key name="keep-shadow-maximized" type="b">
+      <default>false</default>
+      <summary>Keep the custom shadow when a window is maximized/full-screen</summary>
+    </key>
+
+    <!-- focused shadow -->
+    <key name="focused-shadow-opacity" type="i">
+      <range min="0" max="255"/>
+      <default>45</default>
+    </key>
+    <key name="focused-shadow-blur" type="i">
+      <range min="0" max="120"/>
+      <default>18</default>
+    </key>
+    <key name="focused-shadow-spread" type="i">
+      <range min="-50" max="50"/>
+      <default>-2</default>
+    </key>
+    <key name="focused-shadow-x-offset" type="i">
+      <range min="-100" max="100"/>
+      <default>0</default>
+    </key>
+    <key name="focused-shadow-y-offset" type="i">
+      <range min="-100" max="100"/>
+      <default>4</default>
+    </key>
+
+    <!-- unfocused shadow -->
+    <key name="unfocused-shadow-opacity" type="i">
+      <range min="0" max="255"/>
+      <default>28</default>
+    </key>
+    <key name="unfocused-shadow-blur" type="i">
+      <range min="0" max="120"/>
+      <default>12</default>
+    </key>
+    <key name="unfocused-shadow-spread" type="i">
+      <range min="-50" max="50"/>
+      <default>-2</default>
+    </key>
+    <key name="unfocused-shadow-x-offset" type="i">
+      <range min="-100" max="100"/>
+      <default>0</default>
+    </key>
+    <key name="unfocused-shadow-y-offset" type="i">
+      <range min="-100" max="100"/>
+      <default>3</default>
+    </key>
+
+    <!-- ── Debug ───────────────────────────────────────────────────────── -->
+    <key name="debug-mode" type="b">
+      <default>false</default>
+    </key>
+
+
+    <!-- ===== Top Bar (merged from Dash to Panel, 2026-10-07). Defaults = the user's Dash to Panel values. ===== -->
+    <key name="topbar-enabled" type="b">
+      <default>false</default>
+      <summary>Enable Knomadic Top Bar</summary>
+      <description>Run Knomadic's own top bar logic. Disable the Dash to Panel extension first; if both are enabled this stays off.</description>
+    </key>
+    <key name="topbar-color" type="s">
+      <default>'#0d0d0f'</default>
+      <summary>Top bar color</summary>
+    </key>
+    <key name="topbar-opacity" type="d">
+      <range min="0.0" max="1.0"/>
+      <default>1.0</default>
+      <summary>Top bar opacity (0-1)</summary>
+    </key>
+    <key name="topbar-size" type="i">
+      <range min="22" max="64"/>
+      <default>28</default>
+      <summary>Top bar thickness (px)</summary>
+    </key>
+    <key name="topbar-tray-size" type="i">
+      <range min="0" max="64"/>
+      <default>20</default>
+      <summary>Tray font/icon size (px, 0 = theme default)</summary>
+    </key>
+    <key name="topbar-intellihide" type="b">
+      <default>true</default>
+      <summary>Intellihide</summary>
+      <description>Hide the top bar when windows overlap it.</description>
+    </key>
+    <key name="topbar-intellihide-behaviour" type="s">
+      <choices>
+        <choice value="ALL_WINDOWS"/>
+        <choice value="FOCUSED_WINDOWS"/>
+        <choice value="MAXIMIZED_WINDOWS"/>
+      </choices>
+      <default>'ALL_WINDOWS'</default>
+      <summary>Which windows trigger hiding</summary>
+    </key>
+    <key name="topbar-intellihide-animation-time" type="i">
+      <range min="0" max="2000"/>
+      <default>240</default>
+      <summary>Hide/reveal animation time (ms)</summary>
+    </key>
+    <key name="topbar-intellihide-close-delay" type="i">
+      <range min="0" max="5000"/>
+      <default>400</default>
+      <summary>Delay before hiding after the pointer leaves (ms)</summary>
+    </key>
+    <key name="topbar-intellihide-reveal-delay" type="i">
+      <range min="0" max="5000"/>
+      <default>0</default>
+      <summary>Delay before revealing (ms)</summary>
+    </key>
+    <key name="topbar-intellihide-enable-start-delay" type="i">
+      <range min="0" max="10000"/>
+      <default>2000</default>
+      <summary>Delay before intellihide starts after login (ms)</summary>
+    </key>
+    <key name="topbar-intellihide-hide-from-windows" type="b">
+      <default>true</default>
+      <summary>Only hide when windows overlap the bar</summary>
+    </key>
+    <key name="topbar-intellihide-hide-from-monitor-windows" type="b">
+      <default>false</default>
+      <summary>Hide for any window on the monitor</summary>
+    </key>
+    <key name="topbar-intellihide-use-pointer" type="b">
+      <default>true</default>
+      <summary>Reveal when the pointer hits the screen edge</summary>
+    </key>
+    <key name="topbar-intellihide-use-pressure" type="b">
+      <default>true</default>
+      <summary>Require pressure on the edge to reveal</summary>
+    </key>
+    <key name="topbar-intellihide-pressure-threshold" type="i">
+      <range min="1" max="2000"/>
+      <default>200</default>
+      <summary>Pressure needed to reveal</summary>
+    </key>
+    <key name="topbar-intellihide-pressure-time" type="i">
+      <range min="1" max="5000"/>
+      <default>1000</default>
+      <summary>Time window for the pressure (ms)</summary>
+    </key>
+    <key name="topbar-intellihide-revealed-hover" type="b">
+      <default>true</default>
+      <summary>Stay revealed while hovered</summary>
+    </key>
+    <key name="topbar-intellihide-show-in-fullscreen" type="b">
+      <default>true</default>
+      <summary>Allow revealing in fullscreen</summary>
+    </key>
+    <key name="topbar-intellihide-show-on-notification" type="b">
+      <default>false</default>
+      <summary>Reveal on notification</summary>
+    </key>
+    <key name="topbar-intellihide-persisted-state" type="i">
+      <default>-1</default>
+      <summary>Persisted hold state (-1 = off)</summary>
+    </key>
+    <key name="topbar-intellihide-key-toggle" type="as">
+      <default><![CDATA[['<Super>i']]]></default>
+      <summary>Shortcut: hold the bar revealed / release</summary>
+    </key>
+
+    <!-- ===== Window Gap (merged from window-gap@blank.local, 2026-10-07). Defaults = the user's values. ===== -->
+    <key name="windowgap-uniform" type="b">
+      <default>true</default>
+      <summary>Same gap on all edges</summary>
+    </key>
+    <key name="windowgap-gap-size" type="i">
+      <range min="0" max="200"/>
+      <default>8</default>
+      <summary>Uniform gap size (px)</summary>
+    </key>
+    <key name="windowgap-margin-top" type="i">
+      <range min="0" max="200"/>
+      <default>20</default>
+      <summary>Top margin (px)</summary>
+    </key>
+    <key name="windowgap-margin-bottom" type="i">
+      <range min="0" max="200"/>
+      <default>20</default>
+      <summary>Bottom margin (px)</summary>
+    </key>
+    <key name="windowgap-margin-left" type="i">
+      <range min="0" max="200"/>
+      <default>20</default>
+      <summary>Left margin (px)</summary>
+    </key>
+    <key name="windowgap-margin-right" type="i">
+      <range min="0" max="200"/>
+      <default>20</default>
+      <summary>Right margin (px)</summary>
+    </key>
+    <key name="windowgap-no-gap-fullscreen" type="b">
+      <default>true</default>
+      <summary>No gap for fullscreen windows</summary>
+    </key>
+
+    <!-- ===== Shell theme name (merged from the stock User Themes extension, 2026-10-07) ===== -->
+    <key name="theme-name" type="s">
+      <default>'Adwaita-custom'</default>
+      <summary>Shell theme (folder name under ~/.themes; empty = default)</summary>
+    </key>
+
+    <!-- Quick Settings / Date Menu layout (replaces the standalone quick-settings-tweaks extension). Empty order = leave untouched. -->
+    <key name="qs-toggle-order" type="as">
+      <default>['NMWiredToggle','NMWirelessToggle','NMModemToggle','NMBluetoothToggle','NMVpnToggle','BluetoothToggle','PowerProfilesToggle','NightLightToggle','DarkModeToggle','KeyboardBrightnessToggle','RfkillToggle','RotationToggle']</default>
+      <summary>Quick toggle order (constructor names); toggles not listed are hidden</summary>
+    </key>
+    <key name="qs-toggle-hidden" type="as">
+      <default>['NMWiredToggle','NMModemToggle','NMBluetoothToggle','PowerProfilesToggle','DarkModeToggle','RfkillToggle']</default>
+      <summary>Hidden quick toggles</summary>
+    </key>
+    <key name="qs-indicator-order" type="as">
+      <default>[]</default>
+      <summary>System indicator order (GType names); empty = untouched</summary>
+    </key>
+    <key name="qs-indicator-hidden" type="as">
+      <default>[]</default>
+      <summary>Hidden system indicators</summary>
+    </key>
+    <key name="qs-items-order" type="as">
+      <default>[]</default>
+      <summary>Quick settings bottom-row order (battery, laptopSpacer, screenshot, settings, desktopSpacer, lock, shutdown); empty = untouched</summary>
+    </key>
+    <key name="qs-items-hidden" type="as">
+      <default>[]</default>
+      <summary>Hidden bottom-row items</summary>
+    </key>
+    <key name="qs-datemenu-hide-left" type="b">
+      <default>true</default>
+      <summary>Hide the notifications / media box on the left of the date menu</summary>
+    </key>
+  </schema>
+</schemalist>

@@ -1,0 +1,38 @@
+<svg width="16" height="16" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="clip-maximize-active">
+      <circle cx="8" cy="8" r="7"/>
+    </clipPath>
+    <!-- Main body: vertical gradient from pixel samples -->
+    <linearGradient id="body-maximize-active" x1="8" y1="1" x2="8" y2="15" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#30aa00"/>
+      <stop offset="15%" stop-color="#14a800"/>
+      <stop offset="25%" stop-color="#00a400"/>
+      <stop offset="50%" stop-color="#1ca700"/>
+      <stop offset="68%" stop-color="#35a81c"/>
+      <stop offset="80%" stop-color="#46ac31"/>
+      <stop offset="100%" stop-color="#46ac31"/>
+    </linearGradient>
+    <!-- Top specular spot: bright highlight at top of sphere -->
+    <radialGradient id="st-maximize-active" cx="8" cy="2.0" r="3.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#98d878"/>
+      <stop offset="45%"  stop-color="#6ed050" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#6ed050" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Bottom specular spot: subtle secondary highlight -->
+    <radialGradient id="sb-maximize-active" cx="8" cy="13.5" r="2.8" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#68d056" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#68d056" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Invisible bounding rect (matches original SVG convention) -->
+  <rect width="16" height="16" opacity="0"/>
+  <!-- Main body -->
+  <circle cx="8" cy="8" r="7" fill="url(#body-maximize-active)"/>
+  <!-- Top specular overlay (clipped to circle) -->
+  <rect x="1" y="1" width="14" height="7" fill="url(#st-maximize-active)" clip-path="url(#clip-maximize-active)"/>
+  <!-- Bottom specular overlay (clipped to circle) -->
+  <rect x="1" y="8" width="14" height="7" fill="url(#sb-maximize-active)" clip-path="url(#clip-maximize-active)"/>
+  <!-- Icon overlay for hover/active states -->
+  <path d="m6.4107 4.9791 4.586 4.586v-3.5859c0-0.41552-0.5845-0.99998-1-0.99998zm-1.414 1.4141v3.5859c0 0.41552 0.58446 1 0.99998 1h3.5859z" opacity=".5"/>
+</svg>

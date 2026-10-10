@@ -1,0 +1,123 @@
+[ColorEffects:Inactive]
+ChangeSelectionColor=false
+Color=38,38,43
+ColorAmount=0
+ColorEffect=0
+ContrastAmount=0
+ContrastEffect=0
+IntensityAmount=0
+IntensityEffect=0
+
+[Colors:Button]
+BackgroundAlternate=31,31,36
+BackgroundNormal=31,31,36
+DecorationFocus=90,62,139
+DecorationHover=90,62,139
+ForegroundActive=220,220,220
+ForegroundInactive=220,220,220
+ForegroundLink=220,220,220
+ForegroundNegative=130,12,16
+ForegroundNeutral=220,220,220
+ForegroundNormal=220,220,220
+ForegroundPositive=220,220,220
+ForegroundVisited=220,220,220
+
+[Colors:Header]
+BackgroundAlternate=31,31,36
+BackgroundNormal=31,31,36
+DecorationFocus=90,62,139
+DecorationHover=90,62,139
+ForegroundActive=220,220,220
+ForegroundInactive=220,220,220
+ForegroundLink=220,220,220
+ForegroundNegative=130,12,16
+ForegroundNeutral=220,220,220
+ForegroundNormal=220,220,220
+ForegroundPositive=220,220,220
+ForegroundVisited=220,220,220
+
+[Colors:Selection]
+BackgroundAlternate=61,51,82
+BackgroundNormal=61,51,82
+DecorationFocus=90,62,139
+DecorationHover=90,62,139
+ForegroundActive=220,220,220
+ForegroundInactive=220,220,220
+ForegroundNegative=130,12,16
+ForegroundNeutral=220,220,220
+ForegroundNormal=220,220,220
+
+[Colors:Tooltip]
+BackgroundAlternate=70,70,80
+BackgroundNormal=70,70,80
+DecorationFocus=90,62,139
+DecorationHover=90,62,139
+ForegroundActive=220,220,220
+ForegroundInactive=220,220,220
+ForegroundLink=242,205,205
+ForegroundNegative=130,12,16
+ForegroundNeutral=220,220,220
+ForegroundNormal=220,220,220
+ForegroundPositive=220,220,220
+ForegroundVisited=203, 166, 247
+
+[Colors:View]
+BackgroundAlternate=31,31,36
+BackgroundNormal=31,31,36
+DecorationFocus=90,62,139
+DecorationHover=90,62,139
+ForegroundActive=220,220,220
+ForegroundInactive=220,220,220
+ForegroundNegative=130,12,16
+ForegroundNeutral=220,220,220
+ForegroundNormal=220,220,220
+
+[Colors:Window]
+BackgroundAlternate=38,38,43
+BackgroundNormal=38,38,43
+DecorationFocus=90,62,139
+DecorationHover=90,62,139
+ForegroundActive=220,220,220
+ForegroundInactive=220,220,220
+ForegroundNegative=130,12,16
+ForegroundNeutral=220,220,220
+ForegroundNormal=220,220,220
+
+[General]
+shadeSortColumn=false
+
+[Icons]
+Theme=MacTahoe-nord-dark
+
+[KDE]
+LookAndFeelPackage=org.kde.breezedark.desktop
+ShowDeleteCommand=true
+SingleClick=false
+widgetStyle=qt6ct-style
+
+[KFileDialog Settings]
+Allow Expansion=true
+Automatically select filename extension=true
+Breadcrumb Navigation=true
+Decoration position=2
+LocationCombo Completionmode=5
+PathCombo Completionmode=5
+Show Bookmarks=false
+Show Full Path=false
+Show Inline Previews=false
+Show Preview=false
+Show Speedbar=true
+Show hidden files=false
+Sort by=Name
+Sort directories first=true
+Sort hidden files last=true
+Sort reversed=false
+Speedbar Width=227
+View Style=DetailTree
+
+[KShortcutsDialog Settings]
+Dialog Size=638,704
+
+[PreviewSettings]
+EnableRemoteFolderThumbnail=false
+MaximumRemoteSize=0

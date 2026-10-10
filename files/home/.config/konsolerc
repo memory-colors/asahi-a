@@ -1,0 +1,116 @@
+[Desktop Entry]
+DefaultProfile=Profile 1.profile
+
+[General]
+ConfigVersion=1
+
+[KonsoleWindow]
+RememberWindowSize=false
+
+[MainWindow]
+1920x1080 screen: Height=650
+1920x1080 screen: Width=912
+1920x1080 screen: XPosition=980
+1920x1080 screen: YPosition=406
+3840x2160 screen: Height=1344
+3840x2160 screen: Width=1824
+3840x2160 screen: XPosition=90
+3840x2160 screen: YPosition=128
+DP-1=DP-1\x00AND0\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00
+DP-1 Height 1920x1080=320
+DP-1 Width 1920x1080=987
+DisplayPort-0=DisplayPort-0
+DisplayPort-0 Height 1536x864=258
+DisplayPort-0 Height 1920x1080=470
+DisplayPort-0 Height 1920x1080 DisplayPort-0=976
+DisplayPort-0 Height 3840x2160=592
+DisplayPort-0 Width 1536x864=495
+DisplayPort-0 Width 1920x1080=773
+DisplayPort-0 Width 1920x1080 DisplayPort-0=918
+DisplayPort-0 Width 3840x2160=842
+DisplayPort-0 XPosition 1536x864=1002
+DisplayPort-0 XPosition 1920x1080=1110
+DisplayPort-0 XPosition 1920x1080 DisplayPort-0=974
+DisplayPort-0 XPosition 2560x1440=1517
+DisplayPort-0 XPosition 3840x2160=0
+DisplayPort-0 YPosition 1536x864=316
+DisplayPort-0 YPosition 1920x1080=529
+DisplayPort-0 YPosition 1920x1080 DisplayPort-0=72
+DisplayPort-0 YPosition 2560x1440=342
+DisplayPort-0 YPosition 3840x2160=26
+DisplayPort-1 Height 1536x864=294
+DisplayPort-1 Height 1920x1080=506
+DisplayPort-1 Height 3840x2160=1048
+DisplayPort-1 Width 1536x864=560
+DisplayPort-1 Width 1920x1080=839
+DisplayPort-1 Width 3840x2160=1678
+DisplayPort-1 XPosition 1536x864=946
+DisplayPort-1 XPosition 1920x1080=1070
+DisplayPort-1 XPosition 3840x2160=846
+DisplayPort-1 YPosition 1536x864=354
+DisplayPort-1 YPosition 1920x1080=504
+DisplayPort-1 YPosition 3840x2160=534
+HDMI-A-0=HDMI-A-0
+LVDS-0 Height 1440x900=328
+LVDS-0 Height 1680x1050=426
+LVDS-0 LVDS-1-1 Height 1440x900=308
+LVDS-0 LVDS-1-1 Width 1440x900=593
+LVDS-0 LVDS-1-1 XPosition 1440x900=780
+LVDS-0 LVDS-1-1 YPosition 1440x900=361
+LVDS-0 Width 1440x900=588
+LVDS-0 Width 1680x1050=728
+LVDS-0 XPosition 1440x900=817
+LVDS-0 XPosition 1680x1050=884
+LVDS-0 YPosition 1440x900=324
+LVDS-0 YPosition 1680x1050=440
+LVDS-1 Height 1440x900=596
+LVDS-1 Height 1680x1050=609
+LVDS-1 LVDS-1-2 XPosition 1440x900=606
+LVDS-1 LVDS-1-2 YPosition 1440x900=43
+LVDS-1 Width 1440x900=730
+LVDS-1 Width 1680x1050=690
+LVDS-1 XPosition 1440x900=851
+LVDS-1 XPosition 1680x1050=897
+LVDS-1 YPosition 1440x900=215
+LVDS-1 YPosition 1680x1050=182
+LVDS-2 Height 1680x1050=430
+LVDS-2 LVDS-1 Height 1680x1050=343
+LVDS-2 LVDS-1 Width 1680x1050=659
+LVDS-2 Width 1680x1050=906
+LVDS-2 XPosition 1680x1050=752
+LVDS-2 YPosition 1680x1050=440
+MenuBar=Disabled
+StatusBar=Disabled
+ToolBarsMovable=Enabled
+default Height 1440x900=328
+default Width 1440x900=588
+default XPosition 1440x900=817
+default XPosition 800x600=160
+default YPosition 1440x900=324
+default YPosition 800x600=76
+eDP-1=eDP-1
+eDP-1 Height 1680x1050 eDP-1=494
+eDP-1 Height 1920x1200=523
+eDP-1 Height 1920x1200 eDP-1=1071
+eDP-1 Width 1680x1050 eDP-1=743
+eDP-1 Width 1920x1200=851
+eDP-1 Width 1920x1200 eDP-1=1862
+eDP-1 XPosition 1680x1050 eDP-1=896
+eDP-1 XPosition 1920x1200=1010
+eDP-1 XPosition 1920x1200 eDP-1=29
+eDP-1 YPosition 1680x1050 eDP-1=497
+eDP-1 YPosition 1920x1200=619
+eDP-1 YPosition 1920x1200 eDP-1=76
+
+[SearchSettings]
+SearchHighlightMatches=false
+
+[SplitView]
+SplitViewVisibility=AlwaysHideSplitHeader
+
+[TabBar]
+TabBarPosition=Top
+TabBarVisibility=AlwaysHideTabBar
+
+[UiSettings]
+ColorScheme=bluegrey

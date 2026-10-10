@@ -1,0 +1,54 @@
+#!/usr/bin/bash
+# Privileged half of the reboot-picker launcher. Invoked via passwordless
+# sudo (see /etc/sudoers.d/reboot-picker). Sets the next-boot target via
+# asahi-bless, then reboots. Never invoke this directly as a normal user -
+# it does no confirmation of its own, that's the unprivileged reboot-picker
+# script's job.
+#
+# NOTE 2026-09-20: no "macos" case here anymore - reboot-picker no longer
+# calls this helper at all for that target. macOS is always the persistent
+# NVRAM default already, so getting back to it never needed a privileged
+# NVRAM write in the first place - reboot-picker just does a plain
+# unprivileged `systemctl reboot` directly for that case now. This helper
+# only ever handles the two targets that genuinely need root (a one-time
+# NVRAM override away from the default).
+set -euo pipefail
+
+ASAHI_BLESS=${ASAHI_BLESS:-/usr/bin/asahi-bless}
+SYSTEMCTL=${SYSTEMCTL:-/usr/bin/systemctl}
+TARGET=${1:-}
+
+if [[ ! -x "$ASAHI_BLESS" ]]; then
+  printf '%s\n' "asahi-bless is not installed at $ASAHI_BLESS." >&2
+  exit 1
+fi
+if [[ ! -x "$SYSTEMCTL" ]]; then
+  printf '%s\n' "systemctl is not installed at $SYSTEMCTL." >&2
+  exit 1
+fi
+
+# Volume names below are exact strings from `asahi-bless --list-volumes` as
+# of 2026-09-19 (`1) Computer  2) asahi_atomic  *3) Asahi`). If a future OS
+# reinstall/rename changes them, re-run `sudo asahi-bless --list-volumes`
+# and update the names here to match.
+#
+# Standing policy (user's explicit choice, not a "current OS" pattern):
+# every target this helper handles is a one-time override only (--next),
+# regardless of which install this script is running from - cold-booting
+# into any Asahi variant should require holding the power button, never
+# happen automatically. (macOS itself no longer goes through this helper at
+# all - see the note at the top of this file.)
+case "$TARGET" in
+  asahi)
+    "$ASAHI_BLESS" --next --set-boot Asahi -y
+    ;;
+  asahi_atomic)
+    "$ASAHI_BLESS" --next --set-boot asahi_atomic -y
+    ;;
+  *)
+    printf '%s\n' "Unknown target: $TARGET" >&2
+    exit 1
+    ;;
+esac
+
+exec "$SYSTEMCTL" reboot
