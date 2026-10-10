@@ -42,4 +42,4 @@ Create it on the source system, restore it on the new one:
 sudo ./rebuild.sh make-archive /run/media/blank/X10_4TB/asahi-a-archive-private_<date>.tar.zst
 sudo ./rebuild.sh archive --archive /run/media/blank/X10_4TB/asahi-a-archive-private_<date>.tar.zst
 ```
-Contents are listed in `make_archive()` in `rebuild.sh`: ssh/keyrings/Wi-Fi/Mullvad accounts, Brave + Claude Desktop data, shell history, `~/.claude`, notes, the modified icon themes (MacTahoe-nord, MacTahoe-nord-dark, WhiteSur-grey, Bibata-Modern-Ice, breeze_cursors) and the SF fonts (stored once).
+Contents are driven by the classification lists at the top of `rebuild.sh` (loose files in `~` and unpublished `~/Software` items are included automatically; `./rebuild.sh sync-repo` refreshes this repo from the live system without committing): ssh/keyrings/Wi-Fi/Mullvad accounts, Brave + Claude Desktop data, shell history, `~/.claude`, notes, the modified icon themes (MacTahoe-nord, MacTahoe-nord-dark, WhiteSur-grey, Bibata-Modern-Ice, breeze_cursors) and the SF fonts (stored once).
