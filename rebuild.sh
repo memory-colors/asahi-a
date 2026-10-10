@@ -2,7 +2,8 @@
 # rebuild.sh - recreate the "A" system (Fedora Asahi Remix 44 GNOME-ish) on top of a stock Remix 44 MINIMAL install.
 #
 #   sudo ./rebuild.sh [phase ...] [--archive FILE.tar.zst] [--dry-run]
-#   sudo ./rebuild.sh make-archive FILE.tar.zst     (run on the SOURCE system: packs the private data, see below)
+#   sudo ./rebuild.sh make-archive DIR              (run on the SOURCE system: writes asahi-a-archive-private_<date>.tar.zst AND
+#                                                    home-full_<date>.tar.zst into DIR; the date is added automatically)
 #   ./rebuild.sh sync-repo                          (run on the SOURCE system as the normal user: live system -> this repo; never commits)
 #
 # Phases (default = all, in this order; each one asks before it runs):
@@ -29,7 +30,7 @@ while [ $# -gt 0 ]; do
         --archive) ARCHIVE=${2:-}; shift ;;
         make-archive) MAKE_SET=1; MAKE=${2:-}; shift ;;
         sync-repo) SYNC=1 ;;
-        -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
         *) PHASES+=("$1") ;;
     esac
     shift
@@ -69,6 +70,7 @@ SKIP_PATHS=(.cache .var .index .local/share/{LosslessCut,claude,Trash,baloo,flat
     .local/share/{backgrounds,color-schemes,desktop-directories,gtksourceview-5,kservices5,kxmlgui5,pixmaps,sounds}
     .config/{dconf,enchant,goa-1.0,imsettings,mpv,pulse,LosslessCut} .local/bin/claude)
 # archive: the Claude Desktop caches are not worth packing
+FULL_EXCLUDES=(.cache .local/share/Trash)   # full home backup: everything else is included
 ARCHIVE_EXCLUDES=(.config/Claude/claude-code .config/Claude/Cache ".config/Claude/Code Cache" .config/Claude/GPUCache
                   .config/Claude/DawnGraphiteCache .config/Claude/DawnWebGPUCache)
 
@@ -234,9 +236,13 @@ phase_apps() {
 
 make_archive() {   # run on the source system; needs root for the root-only files
     local out=$1 paths=() p f e k
-    [ -n "$out" ] || die "usage: rebuild.sh make-archive FILE.tar.zst"
+    [ -n "$out" ] || die "usage: rebuild.sh make-archive DIR   (an existing directory, e.g. the external drive)"
     [ "$(id -u)" -eq 0 ] || [ $DRY -eq 1 ] || die "run as root (reads root-only files such as Wi-Fi profiles)"
-    [ ! -e "$out" ] || die "$out already exists - refusing to overwrite"
+    [ -d "$out" ] || die "$out is not a directory"
+    local dir=${out%/} stamp; stamp=$(date +%F)
+    local priv=$dir/asahi-a-archive-private_$stamp.tar.zst full=$dir/home-full_$stamp.tar.zst
+    [ ! -e "$priv" ] || die "$priv already exists - refusing to overwrite (delete the old one first)"
+    [ ! -e "$full" ] || die "$full already exists - refusing to overwrite (delete the old one first)"
     cd / || exit 1
     local H=${TARGET_HOME#/}
     add() { for p in "$@"; do if [ -e "/$p" ]; then paths+=("$p"); else warn "missing, skipped: /$p"; fi; done; }
@@ -260,12 +266,22 @@ make_archive() {   # run on the source system; needs root for the root-only file
     unclassified_scan
     local ex=(--anchored) x
     for x in "${ARCHIVE_EXCLUDES[@]}"; do ex+=("--exclude=$H/$x"); done
-    say "archive: ${#paths[@]} items -> $out"
-    if [ $DRY -eq 1 ]; then printf '  /%s\n' "${paths[@]}"; return 0; fi
-    tar --zstd -cpf "$out.partial" --numeric-owner "${ex[@]}" "${paths[@]}" || { rm -f "$out.partial"; die "tar failed, nothing written"; }
-    mv "$out.partial" "$out"
-    echo "Written: $(ls -lh "$out" | awk '{print $5}')  entries: $(tar --zstd -tf "$out" | wc -l)"
-    echo "UNENCRYPTED and contains keys/passwords/history: keep it on the external drive only."
+    say "private archive: ${#paths[@]} items -> $priv"
+    if [ $DRY -eq 1 ]; then
+        printf '  /%s\n' "${paths[@]}"
+        say "full home backup -> $full  (all of /$H except: ${FULL_EXCLUDES[*]})"
+        return 0
+    fi
+    tar --zstd -cpf "$priv.partial" --numeric-owner "${ex[@]}" "${paths[@]}" || { rm -f "$priv.partial"; die "private tar failed, nothing written"; }
+    mv "$priv.partial" "$priv"
+    echo "Written: $priv  $(ls -lh "$priv" | awk '{print $5}')  entries: $(tar --zstd -tf "$priv" | wc -l)"
+    say "full home backup -> $full"
+    local fx=(--anchored); for x in "${FULL_EXCLUDES[@]}"; do fx+=("--exclude=$H/$x"); done
+    tar --zstd -cpf "$full.partial" --numeric-owner "${fx[@]}" "$H" || { rm -f "$full.partial"; die "full tar failed, nothing written"; }
+    mv "$full.partial" "$full"
+    echo "Written: $full  $(ls -lh "$full" | awk '{print $5}')  entries: $(tar --zstd -tf "$full" | wc -l)"
+    echo "Both files are UNENCRYPTED and contain keys/passwords/history: keep them on the external drive only."
+    echo "Restore either one with: rebuild.sh archive --archive FILE   (the full backup also overwrites configs: use only for a complete restore)."
 }
 
 sync_repo() {   # live system -> this repo. Run as the normal user. Never commits or pushes.
@@ -362,7 +378,7 @@ sync_repo() {   # live system -> this repo. Run as the normal user. Never commit
 
 phase_archive() {
     say "archive restore from $ARCHIVE"
-    [ -f "$ARCHIVE" ] || die "$ARCHIVE is not a file (make it with: sudo ./rebuild.sh make-archive FILE.tar.zst)"
+    [ -f "$ARCHIVE" ] || die "$ARCHIVE is not a file (make it with: sudo ./rebuild.sh make-archive DIR)"
     echo "Unpacks over / with the original owners and modes (expects $TARGET_USER = uid 1000)."
     tar --zstd -tf "$ARCHIVE" | sed -n '1,12p'; echo "..."
     ask "Unpack it over the system now?" || return 0

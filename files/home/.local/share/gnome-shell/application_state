@@ -6,16 +6,17 @@
     <application id="brave-browser.desktop" score="0" last-seen="0"/>
     <application id="org.gnome.TextEditor.desktop" score="1178" last-seen="1791646778"/>
     <application id="org.gnome.Shell.Extensions.desktop" score="390" last-seen="1791642355"/>
-    <application id="com.brave.Browser.desktop" score="185" last-seen="1791651143"/>
+    <application id="com.brave.Browser.desktop" score="185" last-seen="1791654842"/>
     <application id="com.mattjakeman.ExtensionManager.desktop" score="26" last-seen="1791521112"/>
     <application id="io.github.dnfui.dnfui.desktop" score="84" last-seen="1791345459"/>
     <application id="smplayer.desktop" score="27" last-seen="1791453861"/>
     <application id="com.interversehq.qView.desktop" score="19" last-seen="1791646871"/>
     <application id="mullvad-vpn.desktop" score="0" last-seen="1791344716"/>
     <application id="xdg-desktop-portal-gtk.desktop" score="0" last-seen="1791503317"/>
-    <application id="org.kde.konsole.desktop" score="2649" last-seen="1791653367"/>
-    <application id="org.kde.dolphin.desktop" score="233" last-seen="1791653367"/>
+    <application id="org.kde.konsole.desktop" score="2945" last-seen="1791655590"/>
+    <application id="org.kde.dolphin.desktop" score="242" last-seen="1791655603"/>
     <application id="org.kde.kcolorchooser.desktop" score="41" last-seen="1791642256"/>
     <application id="org.gnome.Settings.desktop" score="13" last-seen="1791519191"/>
+    <application id="restart-to-macos.desktop" score="0" last-seen="0"/>
   </context>
 </application-state>
