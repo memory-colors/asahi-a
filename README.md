@@ -39,7 +39,7 @@ Missing locale/man/help files are expected and are not an error.
 One unencrypted file kept on the external drive, e.g. `asahi-a-archive-private_<date>.tar.zst` (exFAT cannot hold symlinks/modes, hence a tar).
 Create it on the source system, restore it on the new one:
 ```
-sudo ./rebuild.sh make-archive /run/media/blank/X10_4TB/Software     # writes asahi-a-archive-private_<date>.tar.zst AND home-full_<date>.tar.zst there
+sudo ./rebuild.sh make-archive /run/media/blank/X10_4TB/Software     # writes asahi-a-archive-private_<date>.tar.zst AND asahi-home-full_<date>.tar.zst there
 sudo ./rebuild.sh archive --archive /run/media/blank/X10_4TB/asahi-a-archive-private_<date>.tar.zst
 ```
 Contents are driven by the classification lists at the top of `rebuild.sh` (loose files in `~` and unpublished `~/Software` items are included automatically; `./rebuild.sh sync-repo` refreshes this repo from the live system without committing): ssh/keyrings/Wi-Fi/Mullvad accounts, Brave + Claude Desktop data, shell history, `~/.claude`, notes, the modified icon themes (MacTahoe-nord, MacTahoe-nord-dark, WhiteSur-grey, Bibata-Modern-Ice, breeze_cursors) and the SF fonts (stored once).

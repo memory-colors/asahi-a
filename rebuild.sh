@@ -3,7 +3,7 @@
 #
 #   sudo ./rebuild.sh [phase ...] [--archive FILE.tar.zst] [--dry-run]
 #   sudo ./rebuild.sh make-archive DIR              (run on the SOURCE system: writes asahi-a-archive-private_<date>.tar.zst AND
-#                                                    home-full_<date>.tar.zst into DIR; the date is added automatically)
+#                                                    asahi-home-full_<date>.tar.zst into DIR; the date is added automatically)
 #   ./rebuild.sh sync-repo                          (run on the SOURCE system as the normal user: live system -> this repo; never commits)
 #
 # Phases (default = all, in this order; each one asks before it runs):
@@ -240,7 +240,7 @@ make_archive() {   # run on the source system; needs root for the root-only file
     [ "$(id -u)" -eq 0 ] || [ $DRY -eq 1 ] || die "run as root (reads root-only files such as Wi-Fi profiles)"
     [ -d "$out" ] || die "$out is not a directory"
     local dir=${out%/} stamp; stamp=$(date +%F)
-    local priv=$dir/asahi-a-archive-private_$stamp.tar.zst full=$dir/home-full_$stamp.tar.zst
+    local priv=$dir/asahi-a-archive-private_$stamp.tar.zst full=$dir/asahi-home-full_$stamp.tar.zst
     [ ! -e "$priv" ] || die "$priv already exists - refusing to overwrite (delete the old one first)"
     [ ! -e "$full" ] || die "$full already exists - refusing to overwrite (delete the old one first)"
     cd / || exit 1
