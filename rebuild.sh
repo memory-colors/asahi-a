@@ -1,7 +1,8 @@
 #!/bin/bash
 # rebuild.sh - recreate the "A" system (Fedora Asahi Remix 44 GNOME-ish) on top of a stock Remix 44 MINIMAL install.
 #
-#   sudo ./rebuild.sh [phase ...] [--archive DIR] [--dry-run]
+#   sudo ./rebuild.sh [phase ...] [--archive FILE.tar.zst] [--dry-run]
+#   sudo ./rebuild.sh make-archive FILE.tar.zst     (run on the SOURCE system: packs the private data, see below)
 #
 # Phases (default = all, in this order; each one asks before it runs):
 #   repos     rpm macro (no extra locales), RPM Fusion release, custom .repo files
@@ -9,7 +10,7 @@
 #   files     system files (/etc, /usr, /var), home dotfiles/themes, dconf settings, SELinux relabel
 #   services  enable / disable systemd units, default target
 #   apps      LosslessCut + czkawka-gui from GitHub releases
-#   archive   (only with --archive DIR) restore secrets/personal/big-theme data from your external drive
+#   archive   (only with --archive FILE) unpack the private archive (secrets, personal data, modified icon themes, SF fonts)
 #   verify    compare installed packages and units against the recorded system (read-only)
 #
 # Design rules (user policy): NO dnf -y (dnf shows its own prompts, so you review every package list),
@@ -19,13 +20,14 @@ REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 LISTS=$REPO_DIR/lists.txt
 TARGET_USER=blank          # paths in the saved configs (gdm autologin, symlinks, .desktop files) assume this
 TARGET_HOME=/home/$TARGET_USER
-DRY=0; ARCHIVE=""; PHASES=()
+DRY=0; ARCHIVE=""; PHASES=(); MAKE_SET=""; MAKE=""
 
 while [ $# -gt 0 ]; do
     case $1 in
         --dry-run) DRY=1 ;;
         --archive) ARCHIVE=${2:-}; shift ;;
-        -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
+        make-archive) MAKE_SET=1; MAKE=${2:-}; shift ;;
+        -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
         *) PHASES+=("$1") ;;
     esac
     shift
@@ -170,13 +172,52 @@ phase_apps() {
     as_user chmod +x "$TARGET_HOME/Software/czkawka-gui/czkawka_gui"
 }
 
+make_archive() {   # run on the source system; needs root for the root-only files
+    local out=$1 H=home/$TARGET_USER paths=() p f
+    [ -n "$out" ] || die "usage: rebuild.sh make-archive FILE.tar.zst"
+    [ "$(id -u)" -eq 0 ] || [ $DRY -eq 1 ] || die "run as root (reads root-only files such as Wi-Fi profiles)"
+    [ ! -e "$out" ] || die "$out already exists - refusing to overwrite"
+    cd / || exit 1
+    add() { for p in "$@"; do if [ -e "/$p" ]; then paths+=("$p"); else warn "missing, skipped: /$p"; fi; done; }
+    # secrets / accounts
+    add "$H/.ssh" "$H/.local/share/keyrings" "$H/.local/share/pki" "$H/.config/Mullvad VPN" "$H/.config/transmission" \
+        "$H/.config/evolution" "$H/.local/share/evolution" "$H/Software/Mull.txt" \
+        etc/NetworkManager/system-connections etc/mullvad-vpn \
+        var/lib/AccountsService/users/$TARGET_USER var/lib/AccountsService/icons/$TARGET_USER
+    # browser / app data (Claude Desktop caches are skipped below; Brave is kept whole)
+    add "$H/.config/BraveSoftware" "$H/.config/Claude"
+    # personal / history (incl. ~/.claude with the Claude memory folder - ONE-TIME exception, 2026-10-10)
+    add "$H/.bash_history" "$H/.bash_logout" "$H/.bash_profile" "$H/.directory" "$H/.claude.json" "$H/.claude.json.backup" \
+        "$H/.claude" "$H/Extensions.txt" "$H/this_is_not_atomic.txt" "$H/Downloads" "$H/Screenshots" \
+        "$H/.config/konsolesshconfig" "$H/Software/Claude" "$H/.local/share/applications/rEFInd-install.desktop"
+    shopt -s nullglob
+    for f in "$H"/Software/asahi_to_do.txt "$H"/Software/concat_ffmpeg "$H"/Software/mpv_compressor.txt \
+             "$H"/Software/asahi-setup-reference_*.txt "$H"/Software/debian-enc-*.txt; do paths+=("$f"); done
+    shopt -u nullglob
+    # modified themes/icons and licensed fonts that cannot be downloaded or published (SF fonts stored once; restore copies them to /usr/share/fonts)
+    add usr/share/icons/MacTahoe-nord usr/share/icons/MacTahoe-nord-dark usr/share/icons/WhiteSur-grey \
+        usr/share/icons/Bibata-Modern-Ice usr/share/icons/breeze_cursors \
+        "$H/.local/share/fonts/SF-Compact-static" "$H/.local/share/fonts/SF-Pro-static"
+    local ex=(--anchored "--exclude=$H/.config/Claude/claude-code" "--exclude=$H/.config/Claude/Cache" "--exclude=$H/.config/Claude/Code Cache"
+              "--exclude=$H/.config/Claude/GPUCache" "--exclude=$H/.config/Claude/DawnGraphiteCache" "--exclude=$H/.config/Claude/DawnWebGPUCache")
+    say "archive: ${#paths[@]} items -> $out"
+    if [ $DRY -eq 1 ]; then printf '  /%s\n' "${paths[@]}"; return 0; fi
+    tar --zstd -cpf "$out.partial" --numeric-owner "${ex[@]}" "${paths[@]}" || { rm -f "$out.partial"; die "tar failed, nothing written"; }
+    mv "$out.partial" "$out"
+    echo "Written: $(ls -lh "$out" | awk '{print $5}')  entries: $(tar --zstd -tf "$out" | wc -l)"
+    echo "UNENCRYPTED and contains keys/passwords/history: keep it on the external drive only."
+}
+
 phase_archive() {
     say "archive restore from $ARCHIVE"
-    [ -d "$ARCHIVE" ] || die "$ARCHIVE is not a directory"
-    echo "Layout expected: \$ARCHIVE/home/ -> $TARGET_HOME   \$ARCHIVE/system/ -> /   (see README.md)"
-    ask "Copy it over the system now?" || return 0
-    [ -d "$ARCHIVE/home" ]   && run "${RS_HOME[@]}" "$ARCHIVE/home"/ "$TARGET_HOME"/
-    [ -d "$ARCHIVE/system" ] && run rsync -rltE "$ARCHIVE/system"/ /   # keeps archive owners/modes (root-owned secrets)
+    [ -f "$ARCHIVE" ] || die "$ARCHIVE is not a file (make it with: sudo ./rebuild.sh make-archive FILE.tar.zst)"
+    echo "Unpacks over / with the original owners and modes (expects $TARGET_USER = uid 1000)."
+    tar --zstd -tf "$ARCHIVE" | sed -n '1,12p'; echo "..."
+    ask "Unpack it over the system now?" || return 0
+    run tar --zstd -xpf "$ARCHIVE" -C / --numeric-owner
+    # the SF fonts are stored once (user copy); root GUI apps (pkexec) need them system-wide too
+    local d
+    for d in "$TARGET_HOME"/.local/share/fonts/SF-*; do [ -d "$d" ] && run cp -a "$d" /usr/share/fonts/; done
     run chmod 600 /etc/NetworkManager/system-connections/*.nmconnection 2>/dev/null
     run restorecon -RF /etc/NetworkManager /etc/mullvad-vpn /usr/share/icons /usr/share/fonts /var/lib/AccountsService "$TARGET_HOME" 2>/dev/null
     run fc-cache -f
@@ -199,6 +240,7 @@ phase_verify() {
     rm -rf "$tmp"
 }
 
+if [ -n "$MAKE_SET" ]; then make_archive "$MAKE"; exit $?; fi
 preflight
 for p in "${PHASES[@]}"; do
     case $p in
