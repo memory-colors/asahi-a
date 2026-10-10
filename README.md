@@ -38,4 +38,4 @@ Missing locale/man/help files are expected and are not an error.
 ## External-drive archive (NOT in this repo)
 Mirror this layout under one folder, then `--archive <folder>`:
 - `home/`: `.ssh`, `.bash_history`, `.claude*`, `.config/{BraveSoftware,Claude,Mullvad VPN,transmission,evolution,konsolesshconfig}`, `.local/share/{keyrings,pki}`, `.local/share/fonts/SF-*`, `Downloads`, `Screenshots`, `Software/Mull.txt`, notes
-- `system/`: `etc/NetworkManager/system-connections`, `etc/mullvad-vpn`, `usr/share/icons/{MacTahoe-nord,MacTahoe-nord-dark,WhiteSur-grey,Bibata-*,breeze_cursors}`, `usr/share/fonts/SF-*`, `var/lib/AccountsService/{users,icons}`
+- `system/`: `etc/NetworkManager/system-connections`, `etc/mullvad-vpn`, `usr/share/icons/{MacTahoe-nord,MacTahoe-nord-dark,WhiteSur-grey,Bibata-Modern-Ice,breeze_cursors}`, `usr/share/fonts/SF-*`, `var/lib/AccountsService/{users,icons}`
