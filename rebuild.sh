@@ -192,7 +192,7 @@ make_archive() {   # run on the source system; needs root for the root-only file
         "$H/.config/konsolesshconfig" "$H/Software/Claude" "$H/.local/share/applications/rEFInd-install.desktop"
     shopt -s nullglob
     for f in "$H"/Software/asahi_to_do.txt "$H"/Software/concat_ffmpeg "$H"/Software/mpv_compressor.txt \
-             "$H"/Software/asahi-setup-reference_*.txt "$H"/Software/debian-enc-*.txt; do paths+=("$f"); done
+             "$H"/Software/asahi-setup-reference_*.txt "$H"/Software/debian-enc-*.txt; do add "$f"; done
     shopt -u nullglob
     # modified themes/icons and licensed fonts that cannot be downloaded or published (SF fonts stored once; restore copies them to /usr/share/fonts)
     add usr/share/icons/MacTahoe-nord usr/share/icons/MacTahoe-nord-dark usr/share/icons/WhiteSur-grey \
