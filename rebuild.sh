@@ -163,6 +163,9 @@ phase_apps() {
         runuser -u "$TARGET_USER" -- sh -c "curl -fL '$lc' | tar xj -C '$d' --strip-components=1" || warn "LosslessCut download failed"
     fi
     as_user ln -sfn "$d/losslesscut" "$TARGET_HOME/.local/bin/losslesscut"
+    # the arm64 release ships no ffmpeg; the installed copy points at the system (RPM Fusion) binaries
+    as_user ln -sfn /usr/bin/ffmpeg  "$d/resources/ffmpeg"
+    as_user ln -sfn /usr/bin/ffprobe "$d/resources/ffprobe"
     as_user curl -fL -o "$TARGET_HOME/Software/czkawka-gui/czkawka_gui" "$cz" || warn "czkawka download failed"
     as_user chmod +x "$TARGET_HOME/Software/czkawka-gui/czkawka_gui"
 }
