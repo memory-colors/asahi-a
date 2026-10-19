@@ -1,0 +1,18 @@
+// Reference copy of the Dolphin rows in knomadic@blank.local/prefs.js (inside the Colors page setup, after `systemGroup` / `dolphinStatusGroup` exist).
+// `const dolphinStatusGroup = new Adw.PreferencesGroup({ title: _('Dolphin Status Bar') });` and add it to the ifacePage order list after appColorsGroup.
+const DOLPHIN_COLOR_ROWS = [
+            // [label, key, fallback hex, group]
+            ['Dolphin Sidebar',          'sidebar',     '383840', systemGroup],
+            ['Dolphin Main View',        'view',        '1c1c20', systemGroup],
+            ['Dolphin Accent',           'accent',      '5a3e8b', systemGroup],
+            ['Dolphin Panels',           'window',      '2c2c31', systemGroup],
+            ['Dolphin Tooltips & Menus', 'tooltip',     '383840', systemGroup],
+            ['Dolphin Text',             'text',        'deddda', systemGroup],
+            ['Dolphin Sidebar Text',     'sidebartext', 'dcdcdc', systemGroup],
+            ['Dolphin Button Text',      'buttontext',  'dcdcdc', systemGroup],
+            ['Dolphin URL Text',         'urltext',     'dcdcdc', systemGroup],
+            ['Status Bar Text',          'statustext',  'dcdcdc', dolphinStatusGroup],   // both fade with the text in the inactive split pane
+            ['Disk Usage Text',          'disktext',    'dcdcdc', dolphinStatusGroup],
+        ];
+        for (const [label, key, hex, group] of DOLPHIN_COLOR_ROWS)
+            group.add(makeColorPickRow(_(label), hex, 'dolphin-color.sh', [key]));

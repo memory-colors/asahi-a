@@ -1,0 +1,7 @@
+# Future: standalone install, and macOS arm64 (not started)
+
+**Installer bundle (recommended first):** a versioned tarball with `install.sh`/`uninstall.sh` that places the repo, runs `shim/build.sh --install` (needs Qt6 dev headers + curl), writes the conf with `dolphin-tweaks init`, adds the `.desktop` entry. Stock Dolphin stays untouched; the shim is rebuilt per Dolphin version and architecture. Distro hooks: Fedora `qt6-qtbase-devel qt6-qtbase-private-devel`, Debian `qt6-base-dev qt6-base-private-dev`.
+**Self-built Dolphin:** `patches/dolphin-26.08.0-flat-view-colors.patch` already removes stripes + makes the pane background opaque in source; the rest of the shim would be folded in as source patches. Removes LD_PRELOAD fragility, costs a KF6 build per arch.
+**Flatpak:** possible but heavy (KDE runtime, sandbox file access, patched Breeze doesn't map cleanly) - not recommended.
+
+**macOS arm64:** no `LD_PRELOAD`; the equivalent is `DYLD_INSERT_LIBRARIES` with `__DATA,__interpose` entries pairing each replacement with the original (same hook bodies - that is why `HOOK` is a macro in `common.h`), against a Dolphin that is not SIP-protected (KDE Craft or Homebrew build). Itanium mangling is the same, Mach-O adds a leading underscore. Qt/KF6 on macOS has no qt6ct/GNOME/Knomadic: the conf + `dolphin-tweaks` CLI is the portable contract; a tiny prefs UI would have to be written separately. Realistic path: self-built Dolphin with source patches, with the shim ideas as patches.

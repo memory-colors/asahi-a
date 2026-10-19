@@ -56,7 +56,7 @@ PUBLIC_FILES=(.bashrc
     .config/{kdeglobals,kglobalshortcutsrc,khotkeysrc,kiorc,konsole.kmessagebox,konsolerc,kservicemenurc,ktrashrc}
     .config/{mimeapps.list,monitors.xml,qwhitesurgtkdecorations.conf,user-dirs.dirs,user-dirs.locale}
     ".config/Mullvad VPN/gui_settings.json" .config/LosslessCut/config.json)
-PUBLIC_SOFTWARE=(asahi_atomic "Toggl_*" "lt_grey*")      # globs inside ~/Software; everything else there is PRIVATE
+PUBLIC_SOFTWARE=(asahi_atomic fm-tweaks "Toggl_*" "lt_grey*")      # globs inside ~/Software; everything else there is PRIVATE
 SKIP_SOFTWARE=(czkawka-gui asahi-a)                             # downloaded by the apps phase
 # excluded from the rsync of PUBLIC_DIRS (patterns match at any depth): private, absolute symlinks are dropped by --safe-links
 SYNC_EXCLUDES=(.git original-upstream-extensions __pycache__ '*.bak*' '*.pyc' rEFInd-install.desktop view_properties extensions-bak extension-updates 'SF-*' claude losslesscut)

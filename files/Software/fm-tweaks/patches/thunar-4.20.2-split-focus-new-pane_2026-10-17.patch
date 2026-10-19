@@ -1,0 +1,40 @@
+--- a/thunar/thunar-window.c
++++ b/thunar/thunar-window.c
+@@ -3982,6 +3982,24 @@
+         window->notebook_left = NULL;
+       gtk_notebook_set_show_border (GTK_NOTEBOOK (window->notebook_selected), FALSE);
+ 
++      /* the survivor always goes back to the left slot, so the next split opens its new pane on the right (like Dolphin)
++       * instead of on whichever side happens to be free */
++      if (window->notebook_left == NULL && window->notebook_right != NULL)
++        {
++          GtkWidget *survivor = window->notebook_right;
++
++          g_object_ref (survivor);
++          gtk_container_remove (GTK_CONTAINER (window->paned_notebooks), survivor);
++          gtk_paned_pack1 (GTK_PANED (window->paned_notebooks), survivor, TRUE, FALSE);
++          window->notebook_left = survivor;
++          window->notebook_right = NULL;
++          g_object_unref (survivor);
++        }
++      gtk_style_context_remove_class (gtk_widget_get_style_context (window->notebook_selected), "split-view-inactive-pane");
++
++      /* the remaining view gets the focus (the pane that had it may be gone, or the toolbar button has it) */
++      gtk_widget_grab_focus (window->view);
++
+       g_signal_handlers_disconnect_by_func (window->paned_notebooks, thunar_window_save_paned_notebooks, window);
+       g_signal_handlers_disconnect_by_func (window->paned_notebooks, thunar_window_paned_notebooks_button_press_event, NULL);
+     }
+@@ -4007,8 +4025,10 @@
+         }
+       gtk_paned_set_position (GTK_PANED (window->paned_notebooks), last_splitview_separator_position);
+ 
+-      /* keep focus on the first notebook */
+-      thunar_window_paned_notebooks_switch (window);
++      /* focus the new pane (like Dolphin) instead of switching back to the first notebook: the insert above
++       * already made the new view the current one, so only the pane indication and the focus are left to do */
++      thunar_window_paned_notebooks_indicate_focus (window, window->notebook_selected);
++      gtk_widget_grab_focus (window->view);
+ 
+       g_signal_connect_swapped (window->paned_notebooks, "accept-position", G_CALLBACK (thunar_window_save_paned_notebooks), window);
+       g_signal_connect_swapped (window->paned_notebooks, "button-release-event", G_CALLBACK (thunar_window_save_paned_notebooks), window);
