@@ -11,7 +11,7 @@ InvertSelectionColors=true
 Name=Profile 1
 Parent=FALLBACK/
 TerminalColumns=70
-TerminalRows=33
+TerminalRows=34
 
 [Scrolling]
 HistoryMode=2

@@ -1,0 +1,47 @@
+/* SHARED look (templates/shared.qss.in): rounded context menus + tooltips + the Open With dialog. Safe to load globally (e.g. qt6ct stylesheets=)
+   or per app; the Dolphin-only rules live in dolphin.qss.in. GENERATED output - edit the template / dolphin-tweaks.conf, not this file. */
+QMenu {
+    background-color: #2c2c34;
+    border: 1px solid #45454d;
+    border-radius: 10px;
+    padding: 4px;
+}
+QMenu::item {
+    padding: 4px 22px 4px 10px;
+    margin-left: 0px;
+    border-radius: 5px;
+    font-size: 16px;
+}
+/* KNOMADIC: noicons-menu-padding - menus_have_icons=false / the noicons LD_PRELOAD shim stop Qt from drawing menu icons,
+   but Qt still reserves the icon column's width via the QMenu::icon subcontrol; collapse it so the left padding above
+   is the only indent. Ported from the Debian 2026-10-10 no-icons work (undocumented there; documented here instead). */
+QMenu::icon {
+    width: 0px;
+    padding: 0px;
+}
+QMenu::item:selected {
+    background-color: #483676;
+    selection-background-color: #483676;
+    border: none;
+    color: white;
+}
+QMenu::separator {
+    height: 1px;
+    margin: 4px 8px;
+}
+QToolTip {
+    background-color: #2c2c34;
+    border: 1px solid #3e3e46;
+    border-radius: 10px;
+    padding: 4px 8px;
+    font-size: 16px;
+}
+KOpenWithDialog {
+    background-color: #2c2c34;
+}
+KOpenWithDialog QTreeView {
+    background-color: #2c2c34;
+}
+
+/* kcolorchooser: no 1px frames around the preview swatch and the colour pickers, so colours can be compared */
+QColorDialog QFrame, QColorShowLabel, QColorPicker, QColorLuminancePicker { border: none; border-width: 0px; }

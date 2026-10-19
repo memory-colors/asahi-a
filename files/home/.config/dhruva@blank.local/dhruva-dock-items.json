@@ -7,17 +7,16 @@
     "org.gnome.TextEditor.desktop"
   ],
   "order": [
-    "org.kde.dolphin.desktop",
+    "thunar.desktop",
     "brave-browser.desktop",
     "smplayer.desktop",
     "brave-geijiaoeofpopobjcbeafpacnjmhilfn-Default.desktop",
     "com.interversehq.qView.desktop",
-    "claude-desktop-unofficial.desktop",
     "veracrypt.desktop",
     "transmission-gtk.desktop",
     "restart-to-macos.desktop",
-    "org.kde.konsole.desktop",
-    "com.mattjakeman.ExtensionManager.desktop"
+    "org.gnome.TextEditor.desktop",
+    "org.kde.konsole.desktop"
   ],
   "folders": []
 }

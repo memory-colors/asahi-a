@@ -4,5 +4,5 @@ Terminal=false
 Type=Application
 Name=Jellyfin
 Exec=/opt/brave.com/brave/brave-browser --profile-directory=Default --app-id=geijiaoeofpopobjcbeafpacnjmhilfn
-Icon=jellyfin.svg
+Icon=/home/blank/Software/Jellyfin_2026-10-18_v3.png
 StartupWMClass=crx_geijiaoeofpopobjcbeafpacnjmhilfn

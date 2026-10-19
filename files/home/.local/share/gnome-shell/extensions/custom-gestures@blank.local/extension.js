@@ -13,7 +13,7 @@ import * as VKeyboard from './src/keyboard.js';
 // resolves to for a given window.
 const BRAVE_APP_IDS = new Set(['brave-browser.desktop', 'com.brave.Browser.desktop']);
 
-// Settings-backed accelerators (Dolphin split-view combo, tile-left/right fallback) - see
+// Settings-backed accelerators (Split-view combo, tile-left/right fallback) - see
 // schemas/org.gnome.shell.extensions.custom-gestures.gschema.xml and prefs.js. Read live
 // on every gesture fire rather than cached, so changing them in Settings takes effect
 // immediately with no re-enable needed.
@@ -47,8 +47,8 @@ function parseAccelerator(accel) {
     return keys;
 }
 
-function getDolphinSplitViewKeys() {
-    return parseAccelerator(settings.get_string('dolphin-split-view-accelerator'));
+function getSplitViewKeys() {
+    return parseAccelerator(settings.get_string('split-view-accelerator'));
 }
 
 // Prior approach patched touchpad-gesture-customization@coooolapps.com's own
@@ -58,12 +58,12 @@ function getDolphinSplitViewKeys() {
 // public API - no continuous drag-follow animations.
 
 // Per-app overrides for 3-finger horizontal. Anything not listed falls back to native
-// GNOME tile-left/right (the user's own Alt+Super+Left/Right keybinding). Dolphin is
+// GNOME tile-left/right (the user's own Alt+Super+Left/Right keybinding). the file manager is
 // deliberately NOT listed here (it used to be, both directions -> split view) - that
 // conflicted with tiling, so split view moved to the middle-click override below instead,
-// freeing 3-finger l/r in Dolphin to tile like everywhere else.
+// freeing 3-finger l/r in the file manager to tile like everywhere else.
 //
-// Keyed by .desktop app id (Shell.WindowTracker), same mechanism Dolphin's own override
+// Keyed by .desktop app id (Shell.WindowTracker), same mechanism the file manager's own override
 // uses below and which has been reliable for it throughout. A prior attempt switched
 // Brave specifically to window.get_wm_class() matching instead, theorizing Brave's TWO
 // registered .desktop files (brave-browser.desktop and com.brave.Browser.desktop, both
@@ -97,6 +97,9 @@ const FULLSCREEN_AS_MAXIMIZE_APPS = new Set([
     'org.chromium.Chromium.desktop',
     'microsoft-edge.desktop',
 ]);
+
+// Apps whose split view is driven by the split-view-accelerator (middle-click / 3-finger tap, 3-finger pinch).
+const SPLIT_VIEW_APPS = new Set(['thunar.desktop', 'org.xfce.Thunar.desktop']);
 
 function getFocusedAppId() {
     const window = global.display.focus_window;
@@ -195,9 +198,9 @@ function handleVertical3Finger(direction) {
 // 3-finger tap surfaces as an ordinary synthesized middle-click (libinput's
 // tap-button-map), not a distinct gesture event - so overriding it per-app means
 // intercepting real button events, not a swipe tracker. Consumes ALL middle-clicks
-// while Dolphin is focused (mouse or tap-generated - the user's explicit call, trading
-// away Dolphin's native "middle-click = open in new tab" entirely for split view).
-class DolphinMiddleClickOverride {
+// while the file manager is focused (mouse or tap-generated - the user's explicit call, trading
+// away the native "middle-click = open in new tab" entirely for split view).
+class SplitViewMiddleClickOverride {
 
     constructor() {
         this._handlerId = global.stage.connect('captured-event', this._onEvent.bind(this));
@@ -213,11 +216,11 @@ class DolphinMiddleClickOverride {
         if (event.get_button() !== 2)
             return Clutter.EVENT_PROPAGATE;
 
-        if (getFocusedAppId() !== 'org.kde.dolphin.desktop')
+        if (!SPLIT_VIEW_APPS.has(getFocusedAppId()))
             return Clutter.EVENT_PROPAGATE;
 
         if (type === Clutter.EventType.BUTTON_PRESS)
-            VKeyboard.sendKeys(getDolphinSplitViewKeys());
+            VKeyboard.sendKeys(getSplitViewKeys());
 
         return Clutter.EVENT_STOP;
     }
@@ -232,8 +235,8 @@ class DolphinMiddleClickOverride {
 }
 
 function handlePinch3Finger() {
-    if (getFocusedAppId() === 'org.kde.dolphin.desktop')
-        VKeyboard.sendKeys(getDolphinSplitViewKeys());
+    if (SPLIT_VIEW_APPS.has(getFocusedAppId()))
+        VKeyboard.sendKeys(getSplitViewKeys());
 }
 
 // Shared by handleVertical4Finger (any app, on entering fullscreen/maximize via the
@@ -245,9 +248,9 @@ function handlePinch3Finger() {
 // native move-to-workspace-right keybinding would do, and what an earlier version of
 // this function did) - that would land two apps fullscreened back-to-back on the SAME
 // workspace whenever the first one wasn't on the immediately-preceding slot (e.g.
-// fullscreen Dolphin from the desktop -> workspace 1, then fullscreen Terminal also from
+// fullscreen the file manager from the desktop -> workspace 1, then fullscreen Terminal also from
 // the desktop -> naive "move one right of my own position" would ALSO put it on
-// workspace 1 alongside Dolphin, not bump Dolphin anywhere - GNOME's native action has no
+// workspace 1 alongside the file manager, not bump the file manager anywhere - GNOME's native action has no
 // concept of "the target's already occupied, go further"). This scans for real vacancy
 // instead. Relies on fixed/static workspaces (org.gnome.mutter dynamic-workspaces=false)
 // having a stable, known count to scan - the dynamic-mode consolidation problem that the
@@ -420,6 +423,28 @@ class WorkspaceCompactor {
 
 }
 
+// Tiling (and maximize) is reported by mutter as a MAXIMIZE/UNMAXIMIZE size change, and the stock shell answers it with a
+// clone-scale-and-fade animation that reads as a "bounce". Completing the change immediately (what the shell does when it
+// decides not to animate) removes it; fullscreen and monitor-move keep their animation. The shell connects _sizeChangeWindow
+// through a bound copy, so it can't be replaced - but it calls this._prepareAnimationInfo at call time, so an instance property wins.
+class NoTileBounce {
+    constructor() {
+        this._wm = Main.wm;
+        this._wm._prepareAnimationInfo = function (shellwm, actor, oldFrameRect, change) {
+            if (change === Meta.SizeChange.MAXIMIZE || change === Meta.SizeChange.UNMAXIMIZE) {
+                shellwm.completed_size_change(actor);
+                return;
+            }
+            return Object.getPrototypeOf(this)._prepareAnimationInfo.call(this, shellwm, actor, oldFrameRect, change);
+        };
+    }
+
+    destroy() {
+        delete this._wm._prepareAnimationInfo;   // drops the instance override; the prototype method is back
+        this._wm = null;
+    }
+}
+
 export default class CustomGesturesExtension extends Extension {
 
     enable() {
@@ -431,9 +456,10 @@ export default class CustomGesturesExtension extends Extension {
             '4-vertical': handleVertical4Finger,
         });
         this._pinch3 = new DiscretePinchGesture([3], handlePinch3Finger);
-        this._dolphinMiddleClick = new DolphinMiddleClickOverride();
+        this._splitViewMiddleClick = new SplitViewMiddleClickOverride();
         this._braveNewWorkspace = new BraveNewWorkspaceHandler();
         this._workspaceCompactor = new WorkspaceCompactor();
+        this._noTileBounce = new NoTileBounce();
     }
 
     disable() {
@@ -441,12 +467,14 @@ export default class CustomGesturesExtension extends Extension {
         this._swipeRouter = undefined;
         this._pinch3?.destroy();
         this._pinch3 = undefined;
-        this._dolphinMiddleClick?.destroy();
-        this._dolphinMiddleClick = undefined;
+        this._splitViewMiddleClick?.destroy();
+        this._splitViewMiddleClick = undefined;
         this._braveNewWorkspace?.destroy();
         this._braveNewWorkspace = undefined;
         this._workspaceCompactor?.destroy();
         this._workspaceCompactor = undefined;
+        this._noTileBounce?.destroy();
+        this._noTileBounce = undefined;
         VKeyboard.cleanup();
         settings = null;
     }

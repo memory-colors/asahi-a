@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Zero volume at login
-Comment=Resets output volume to 0 at every desktop login, on A and on golden B alike. Runs on A too intentionally.
-Exec=/bin/bash -c 'for i in $(seq 1 10); do wpctl set-volume @DEFAULT_AUDIO_SINK@ 0 2>/dev/null && exit 0; sleep 1; done'
+Name=Quiet volume at login
+Comment=Sets output volume to 1% at every desktop login, on A and on golden B alike. Runs on A too intentionally.
+Exec=/bin/bash -c 'for i in $(seq 1 10); do wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.01 2>/dev/null && exit 0; sleep 1; done'
 X-GNOME-Autostart-enabled=true
 NoDisplay=true
 Terminal=false

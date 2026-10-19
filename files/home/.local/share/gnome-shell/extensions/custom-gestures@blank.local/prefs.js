@@ -23,8 +23,8 @@ export default class CustomGesturesPreferences extends ExtensionPreferences {
         page.add(group);
 
         const rows = [
-            ['dolphin-split-view-accelerator', _('Dolphin split view'),
-                _('Must match Dolphin\'s own "Split View" shortcut (Settings > Configure Shortcuts)')],
+            ['split-view-accelerator', _('Split view (file manager)'),
+                _('Must match the file manager\'s own "Split View" shortcut')],
             ['tile-left-accelerator', _('Tile window left (default fallback)'),
                 _('Must match this system\'s real tile-left keybinding')],
             ['tile-right-accelerator', _('Tile window right (default fallback)'),

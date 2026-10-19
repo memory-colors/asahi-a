@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
   <schema id="org.gnome.shell.extensions.custom-gestures" path="/org/gnome/shell/extensions/custom-gestures/">
-    <key name="dolphin-split-view-accelerator" type="s">
+    <key name="split-view-accelerator" type="s">
       <default>'&lt;Control&gt;&lt;Shift&gt;t'</default>
-      <summary>Dolphin split-view accelerator</summary>
-      <description>Keyboard accelerator simulated for Dolphin's "Split View" action (3-finger pinch, and middle-click while Dolphin is focused). Must match Dolphin's own configured shortcut for Split View (Settings &gt; Configure Shortcuts) - GTK accelerator format, e.g. "&lt;Control&gt;&lt;Shift&gt;t". Modifier names: Control, Shift, Alt, Super. The trailing key name must match its real GNOME/X11 keysym name exactly (lowercase for plain letters, e.g. "t"; capitalized for named keys, e.g. "Tab", "Page_Up").</description>
+      <summary>Split-view accelerator</summary>
+      <description>Keyboard accelerator simulated for the file manager's "Split View" action (3-finger pinch, and middle-click while the file manager is focused). Must match the file manager's own configured shortcut for Split View (Settings &gt; Configure Shortcuts) - GTK accelerator format, e.g. "&lt;Control&gt;&lt;Shift&gt;t". Modifier names: Control, Shift, Alt, Super. The trailing key name must match its real GNOME/X11 keysym name exactly (lowercase for plain letters, e.g. "t"; capitalized for named keys, e.g. "Tab", "Page_Up").</description>
     </key>
     <key name="tile-left-accelerator" type="s">
       <default>'&lt;Alt&gt;&lt;Super&gt;Left'</default>

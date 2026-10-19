@@ -13,15 +13,15 @@
 # matched anything, so no edit from that version ever visually took) - NOT
 # a generic `headerbar`. Its headerbar normally just
 # inherits GTK4's global `headerbar_bg_color` token, which is actually owned
-# by master_black_background.sh's "Dark background" role (NOT
-# set-titlebar-color.sh - that script only ever touches
+# by set-dark-background.sh's "Dark background" role (NOT
+# set-qt-titlebar-color.sh - that script only ever touches
 # ~/.config/qwhitesurgtkdecorations.conf, the KDE/Qt window-decoration
 # config, which a native libadwaita headerbar never reads).
 #
 # This script instead writes a dedicated, anchor-scoped
 # `editor-window headerbar` block, appended to gtk-4.0/gtk.css between its
 # own marker comments - never touches the global headerbar_bg_color token
-# or any other app's headerbar, and is immune to master_black_background.sh
+# or any other app's headerbar, and is immune to set-dark-background.sh
 # or any grey-shift run overwriting it back.
 #
 # Usage: ./set-text-editor-titlebar-color.sh <new-hex-color>
@@ -61,7 +61,6 @@ if [ ! -f "$GTK4_CSS" ]; then
     exit 1
 fi
 
-cp "$GTK4_CSS" "${GTK4_CSS}.bak-pre-texteditor-titlebar-${NEW_HEX}"
 
 BLOCK=$(cat <<EOF
 $MARK_BEGIN

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-_scoped_replace.py - scoped (never blind) color edits shared by grey_foreground.sh and master_black_background.sh.
+_scoped_replace.py - scoped (never blind) color edits shared by set-light-background.sh and set-dark-background.sh.
 (set-accent-color.sh uses its own tested helper _accent_apply.py with the same CSS rules.)
 
   css     <old_hex> <new_hex> [--skip-token a,b] FILE...

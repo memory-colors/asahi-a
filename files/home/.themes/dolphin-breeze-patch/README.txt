@@ -1,9 +1,0 @@
-Asahi (aarch64) Dolphin line-cleanup build, 2026-10-03. Ported from Debian (see ~/DOLPHIN_REDO.txt).
-- breeze-6.7.5-asahi.patch : apply to Breeze 6.7.5 kstyle/breezestyle.cpp (use `git apply -p1`; `patch` is not installed). Colors: #1b1b1d (lines/background/scrollbar idle/path bar), #623e8b scrollbar hover. Includes the path-bar fill (PE_FrameLineEdit on KUrlNavigator).
-- kcapacitybar.cpp.patched : drop into kf6-kwidgetsaddons 6.30.0 src/ (colors #1b1b1d track, #383840 fill).
-- breeze6.so.aarch64-built : the built plugin (installed copy lives in ~/.themes/qt-plugins/qt6/styles/).
-Install plugins by writing a NEW file then mv over (never cp over a loaded .so: running Qt apps crash).
-Build cmd: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DKDE_INSTALL_USE_QT_SYS_PATHS=ON -DBUILD_QT5=OFF -DBUILD_QT6=ON -DWITH_DECORATIONS=OFF ; cmake --build build --target breeze6
-Build deps (dnf): extra-cmake-modules kf6-frameworkintegration-devel kf6-kcmutils-devel kf6-kcodecs-devel kf6-kcolorscheme-devel kf6-kconfig-devel kf6-kcoreaddons-devel kf6-kguiaddons-devel kf6-ki18n-devel kf6-kiconthemes-devel kf6-kirigami-devel kf6-kwidgetsaddons-devel kf6-kwindowsystem-devel
-(The old Debian rebuild guide for the Breeze patch was in a previous handoff note and is not in the current one.)
-- dolphin-expander-arrows.cpp (2026-10-10) : LD_PRELOAD shim -> ~/.themes/kf6-patched/libdolphin-expander-arrows.so, loaded by the Dolphin launcher Exec. Why: any app stylesheet makes QStyleSheetStyle swallow Dolphin's PE_IndicatorBranch call, so the Details-view expand arrows were never drawn. It overrides KStandardItemListWidget::drawSiblingsInformation (chevron only, no tree lines) and updateExpansionArea (GAP_REDUCTION 4 px, INDENT_FRACTION 0.5). Constants at the top of the .cpp, build line at the bottom (needs the matching dolphin-<ver> source for headers). Rebuild after every dolphin update; install a new .so by writing a new file then mv.

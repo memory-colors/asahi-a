@@ -12,6 +12,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { GapManager } from './gapManager.js';
 
 const PREFIX = 'windowgap-';
+const FORCE_COOLDOWN_MS = 350;   // see rebuild() below: forced requests this soon after a rebuild are our own reflow echoing back: ignore them
 const OLD_UUID = 'window-gap@blank.local';
 
 // GapManager asks for 'uniform', 'gap-size', 'margin-top', ... ; map them to Knomadic's prefixed keys.
@@ -66,6 +67,13 @@ export class WindowGap {
         // keep the bounce fix. The debounce collapses multiple requests into one
         // call - if ANY of them asked for force, the collapsed call is forced too.
         const rebuild = (force = false) => {
+            // Feedback-loop fix (2026-10-10, 2nd version): a forced rebuild destroys/recreates the strut actors, Mutter re-tiles the window and the
+            // resulting 'size-change' used to request ANOTHER forced rebuild (flip loop: Konsole 954x1068 <-> 960x1080 several times at open).
+            // A forced request that arrives within FORCE_COOLDOWN_MS of a rebuild we just did is that echo: ignore it. The ORIGINAL two-pass
+            // design stays intact (forced pass + forced 150ms retry): the first pass leaves a freshly tiled window ungapped, the forced retry's
+            // reflow re-applies the gapped tile (making the retry non-forced removed the gap entirely).
+            if (force && GLib.get_monotonic_time() / 1000 - (this._lastRebuildAt ?? -1e9) < FORCE_COOLDOWN_MS)
+                return;
             if (force)
                 this._pendingForce = true;
             if (this._rebuildId)
@@ -74,10 +82,12 @@ export class WindowGap {
                 this._rebuildId = 0;
                 const doForce = this._pendingForce;
                 this._pendingForce = false;
+                this._lastRebuildAt = GLib.get_monotonic_time() / 1000;
                 this._gapManager.rebuild(doForce);
                 if (this._retryId)
                     GLib.source_remove(this._retryId);
                 this._retryId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 150, () => {
+                    this._lastRebuildAt = GLib.get_monotonic_time() / 1000;
                     this._gapManager.rebuild(doForce);
                     this._retryId = 0;
                     return GLib.SOURCE_REMOVE;
@@ -98,7 +108,11 @@ export class WindowGap {
         // trigger - size-change fires for any window geometry change
         // (maximize, unmaximize, tile, unfullscreen), and rebuild() is cheap.
         // Forced: this is the actual geometry change tiling relies on to reflow.
-        global.window_manager.connectObject('size-change', () => rebuild(true), this);
+        // 2026-10-16: NOT forced any more. The edge strips are the same before and after a tile, so tearing them down and recreating them
+        // made mutter lay the tiled window out twice (full half-screen first, then gapped) = the visible "twitch" at the screen edge.
+        // Unforced, rebuild() only touches the strips when the computed state really changed (e.g. a window going maximized on both axes
+        // drops the gap). To undo: put `rebuild(true)` back here.
+        global.window_manager.connectObject('size-change', () => rebuild(false), this);
         // Closing a maximized window (rather than un-maximizing it) doesn't
         // fire size-change on anything - focus just moves elsewhere (or
         // nowhere). Catch that case too. Not forced: pure focus/attention

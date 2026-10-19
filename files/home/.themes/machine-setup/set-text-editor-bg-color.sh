@@ -77,7 +77,6 @@ if [ ! -f "$GTK4_CSS" ]; then
     exit 1
 fi
 
-cp "$GTK4_CSS" "${GTK4_CSS}.bak-pre-texteditor-bg-${NEW_HEX}"
 
 BLOCK=$(cat <<EOF
 $MARK_BEGIN

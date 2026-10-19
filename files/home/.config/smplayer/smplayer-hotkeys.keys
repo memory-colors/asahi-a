@@ -99,7 +99,7 @@ show_playlist	P
 show_file_properties	Ctrl+I
 show_preferences	Ctrl+P
 show_tube_browser	F11
-show_mplayer_log	Ctrl+M
+show_mplayer_log	
 show_smplayer_log	Ctrl+S
 tablet_mode	
 first_steps	

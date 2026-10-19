@@ -30,7 +30,7 @@
 # depend on vo=x11, which depends on XWayland - the native-Wayland
 # decoration plugin isn't compatible with that setup. Shelved per user
 # 2026-09-28 rather than chase a different vo driver right now.
-/usr/bin/smplayer "$@" &
+env -u QT_QPA_PLATFORMTHEME QT_STYLE_OVERRIDE=Breeze LD_PRELOAD="$HOME/.themes/qt-fm/libqt-fm.so:$HOME/.themes/qt-noicons/libqt-noicons.so" "$HOME/.local/opt/smplayer-qt6/bin/smplayer" "$@" &
 SMPLAYER_PID=$!
 
 # Give the window time to actually map and take focus before tiling it -

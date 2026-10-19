@@ -24,7 +24,6 @@ if [ -d ~/.bashrc.d ]; then
 fi
 unset rc
 
-export QT_QPA_PLATFORMTHEME="qt6ct"
 export PATH="$HOME/.local/bin:$PATH"
 
 # Plain "claude" always continues the most recent conversation instead of

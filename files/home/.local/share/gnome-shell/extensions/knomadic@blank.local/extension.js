@@ -40,6 +40,7 @@ import { TopBar } from './topbar/topbar.js';
 import { WindowGap } from './gap/gap.js';
 import { ThemeManager } from './theme/theme.js';
 import { QuickSettingsLayout } from './qs/quickSettings.js';
+import { PopupDismiss } from './popup/popupDismiss.js';
 
 import { RoundedCornersEffect, ClipShadowEffect } from './effect.js';
 
@@ -48,7 +49,7 @@ import { RoundedCornersEffect, ClipShadowEffect } from './effect.js';
 // ─────────────────────────────────────────────────────────────────────────────
 const ROUNDED_CORNERS_EFFECT = 'rwc-rounded-corners';
 const CLIP_SHADOW_EFFECT      = 'rwc-clip-shadow';
-const SHADOW_PADDING          = 22;   // extra pixels around the shadow actor
+const SHADOW_PADDING          = 22;   // minimum extra pixels around the shadow actor (grows with the shadow settings, see shadowPad)
 // Ported from Debian 2026-10-06. After a focused window is closed/minimized, mutter hands focus back to the
 // LAST-focused window, so a second swipe-quit with a stationary pointer hits the wrong one. This focuses the
 // window under the pointer instead. Set false to disable.
@@ -319,6 +320,18 @@ function computeBounds(actor) {
 // Shadow helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Logical padding (px) the shadow actor needs so the CSS box-shadow is never clipped at the actor edge.
+ *  box-shadow reaches spread + blur + offset beyond the window; a fixed padding cut it off with a hard edge once those
+ *  settings grew past it. Uses the larger of the focused/unfocused shadows so focus changes never resize the actor. */
+function shadowPad() {
+    let need = 0;
+    for (const focused of [true, false]) {
+        const c = shadowConfig(focused);
+        need = Math.max(need, c.spread + c.blur + Math.max(Math.abs(c.xOffset), Math.abs(c.yOffset)));
+    }
+    return Math.min(300, Math.max(SHADOW_PADDING, Math.ceil(need) + 2));
+}
+
 /** Build the CSS box-shadow string from a shadow config object. */
 function boxShadowCss(sc, scale) {
     const alpha  = (sc.opacity / 255).toFixed(3);
@@ -344,7 +357,7 @@ function createShadow(actor) {
     // Bind x, y, width, height to the window actor (with padding offsets)
     const [dx, dy, dw, dh] = contentOffset(actor.metaWindow);
     const sc = scaleFactor(actor.metaWindow);
-    const pad = SHADOW_PADDING * sc;
+    const pad = shadowPad() * sc;
 
     const offsets = [
         dx - pad,      // X
@@ -379,19 +392,21 @@ function refreshShadowStyle(actor, shadowActor) {
     const origScale  = St.ThemeContext.get_for_stage(global.stage).scale_factor;
     const cssScale   = sc / origScale;
 
-    const pad    = SHADOW_PADDING * cssScale;
+    const pad    = shadowPad() * cssScale;
     const cfg    = buildConfig();
     const scfg   = shadowConfig(win.appears_focused);
 
-    // Compute the CSS border-radius to match the shader's squircle.
-    // The shader uses:  exponent = smoothing*10+2,  radius = outerR * 0.5 * exponent
-    // CSS border-radius only supports circular arcs (exponent=2).
-    // A squircle extends further along diagonals than a circle of the same radius,
-    // so using the shader's radius for the CSS guarantees the transparent background
-    // never shows through the shader's transparent corners.
+    // CSS border-radius for the shadow's inner box, matched to the shader's squircle.
+    // The shader's corner box is shaderR x shaderR (shaderR = cornerRadius*0.5*exponent) and its curve is |d|_exponent = shaderR,
+    // so shaderR is the squircle's SIZE parameter, not its visible radius: using it as a CSS (circular) radius made the shadow
+    // corners far rounder than the window (66px vs ~25px at radius 22 / smoothing 0.4). CSS only draws circular arcs, so use the
+    // circle whose corner inset along the diagonal equals the squircle's: r_circle = shaderR*(1-2^(-1/e))/(1-1/sqrt2)
+    // (= shaderR at e=2). The shadow is only drawn OUTSIDE this box and the clip effect erases it inside the squircle, so a circle
+    // that is very slightly rounder than the squircle (x1.08) guarantees no gap shows in the window's transparent corners.
     const exponent    = cfg.smoothing * 10 + 2;
     const shaderR     = cfg.cornerRadius * 0.5 * exponent;
-    const radius      = shaderR * cssScale;
+    const circleR     = shaderR * (1 - Math.pow(2, -1 / exponent)) / (1 - Math.SQRT1_2);
+    const radius      = circleR * 1.08 * cssScale;
 
     const inner = shadowActor.get_first_child();
     if (!inner) return;
@@ -437,7 +452,7 @@ function refreshShadowClip(actor, shadowActor) {
     // Window content rect within the shadow actor in pixel coordinates
     const [dx, dy, dw, dh] = contentOffset(actor.metaWindow);
     const sc  = scaleFactor(actor.metaWindow);
-    const pad = SHADOW_PADDING * sc;
+    const pad = shadowPad() * sc;
 
     const cfg    = buildConfig();
     const outerR = cfg.cornerRadius * sc;
@@ -448,10 +463,13 @@ function refreshShadowClip(actor, shadowActor) {
     let radius   = outerR * 0.5 * exponent;
 
     // Account for padding inset (same as RoundedCornersEffect)
-    const bx1 = pad + dx + cfg.padding.left   * sc;
-    const by1 = pad + dy + cfg.padding.top    * sc;
-    const bx2 = pad + dx + actor.width  + dw - cfg.padding.right  * sc;
-    const by2 = pad + dy + actor.height + dh - cfg.padding.bottom * sc;
+    // The shadow actor is already positioned at (frame - pad) by its BindConstraints (offset dx - pad), so the window's frame
+    // starts at `pad` in shadow-local coordinates: dx/dy must NOT be added again here (that shifted the clip hole right/down by
+    // the buffer margin and left a transparent gap between window and shadow). Width/height of the frame = actor size + dw/dh.
+    const bx1 = pad + cfg.padding.left   * sc;
+    const by1 = pad + cfg.padding.top    * sc;
+    const bx2 = pad + actor.width  + dw - cfg.padding.right  * sc;
+    const by2 = pad + actor.height + dh - cfg.padding.bottom * sc;
 
     const maxR = Math.min(bx2 - bx1, by2 - by1) / 2;
     if (maxR > 0 && radius > maxR) {
@@ -460,6 +478,7 @@ function refreshShadowClip(actor, shadowActor) {
     }
 
     effect.setClip([bx1, by1, bx2, by2], radius, exponent);
+    if (getB('debug-mode')) effect._dbgClip = `[${bx1.toFixed(1)},${by1.toFixed(1)},${bx2.toFixed(1)},${by2.toFixed(1)}] r=${radius.toFixed(1)} e=${exponent.toFixed(2)} shadowActor=${sw}x${sh}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -497,6 +516,10 @@ function onAddEffect(actor) {
 
     _actorMap.set(actor, { shadow, bindings, timeoutId: 0 });
     refreshRoundedCorners(actor);
+    scheduleResync(actor);   // also re-sorts the shadow below its window once the window has been raised/mapped
+    if (getB('debug-mode'))
+        for (const ms of [300, 1500])
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => { if (_actorMap.has(actor)) dbgShadowDump(actor, `+${ms}ms`); return GLib.SOURCE_REMOVE; });
 }
 
 /** Remove effects and shadow from a window actor. */
@@ -576,7 +599,7 @@ function refreshRoundedCorners(actor) {
         // Keep BindConstraint offsets in sync with the current window geometry
         const [dx, dy, dw, dh] = contentOffset(win);
         const sc  = scaleFactor(win);
-        const pad = SHADOW_PADDING * sc;
+        const pad = shadowPad() * sc;
         const newOffsets = [dx - pad, dy - pad, dw + 2 * pad, dh + 2 * pad];
 
         if (data.shadow) {
@@ -584,6 +607,14 @@ function refreshRoundedCorners(actor) {
                 if (c instanceof Clutter.BindConstraint)
                     c.offset = newOffsets[i];
             });
+        }
+
+        if (getB('debug-mode')) {
+            const fr = win.get_frame_rect(), bf = win.get_buffer_rect(), sh = data.shadow;
+            const geo = `${win.get_wm_class()} frame=${fr.x},${fr.y} ${fr.width}x${fr.height} buf=${bf.x},${bf.y} ${bf.width}x${bf.height} ` +
+                `actor=${actor.x},${actor.y} ${actor.width}x${actor.height} d=[${dx},${dy},${dw},${dh}] pad=${pad} ` +
+                `shadow=${sh ? `${sh.x},${sh.y} ${sh.width}x${sh.height}` : 'none'} max=${win.maximizedHorizontally}/${win.maximizedVertically}`;
+            if (data.lastGeo !== geo) { data.lastGeo = geo; logDbg(`GEO ${geo}`); }
         }
     }
 }
@@ -639,6 +670,52 @@ function disconnectAll() {
 // Per-window signal setup / teardown
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Re-sync a window's shadow/shader once more shortly after a geometry change. Tiling/untiling and drags update the frame
+ *  rect and the buffer rect at different moments, so the first refresh (on actor size) can read a stale frame-vs-buffer
+ *  offset and leave the shadow actor misplaced (blank gap, missing side). One pending timer per window. */
+function scheduleResync(actor) {
+    const data = _actorMap.get(actor);
+    if (!data || data.timeoutId) return;
+    data.timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 80, () => {
+        data.timeoutId = 0;
+        if (_actorMap.has(actor) && actor.metaWindow) {
+            refreshRoundedCorners(actor);
+            fixShadowOrder(actor);
+        }
+        return GLib.SOURCE_REMOVE;
+    });
+}
+
+/** Debug: one-shot dump of everything that decides whether a window's shadow is actually painted (debug-mode only). */
+function dbgShadowDump(actor, tag) {
+    try {
+        const d = _actorMap.get(actor), sh = d?.shadow;
+        if (!sh) return;
+        const wg = global.windowGroup, kids = wg.get_children();
+        const i = kids.indexOf(sh), j = kids.indexOf(actor);
+        const nm = a => a ? (a.metaWindow ? `W:${a.metaWindow.get_wm_class()}` : (a.name || a.constructor.name)) : 'none';
+        const ab = sh.get_allocation_box(), [tx, ty] = sh.get_transformed_position(), [tw, th] = sh.get_transformed_size();
+        const eff = sh.get_effect(CLIP_SHADOW_EFFECT), inner = sh.get_first_child();
+        logDbg(`SHADOW ${tag} ${actor.metaWindow?.get_wm_class()}: visible=${sh.visible} opacity=${sh.opacity} paintOpacity=${sh.get_paint_opacity()} mapped=${sh.mapped} ` +
+            `alloc=${ab.x1.toFixed(0)},${ab.y1.toFixed(0)}..${ab.x2.toFixed(0)},${ab.y2.toFixed(0)} stage=${tx.toFixed(0)},${ty.toFixed(0)} ${tw.toFixed(0)}x${th.toFixed(0)} ` +
+            `stack shadow=${i} actor=${j}/${kids.length} below=${nm(kids[i - 1])} above=${nm(kids[i + 1])} ` +
+            `effect=${eff ? `enabled=${eff.enabled}` : 'MISSING'} clip=${eff?._dbgClip ?? 'unset'} inner="${(inner?.style ?? '').replace(/\s+/g, ' ').slice(0, 70)}" ` +
+            `actorVisible=${actor.visible} actorOpacity=${actor.opacity} actorMapped=${actor.mapped} winMax=${actor.metaWindow?.maximizedHorizontally}/${actor.metaWindow?.maximizedVertically}`);
+    } catch (e) {
+        logDbg(`SHADOW dump failed: ${e}`);
+    }
+}
+
+/** Keep a window's shadow directly below its window actor in the window group. The 'restacked' handler alone missed the open
+ *  path (the new window is raised AFTER its shadow is created without another restack), so a new window's shadow stayed under
+ *  other windows until the first move/restack: it vanished over any window it overlapped. */
+function fixShadowOrder(actor) {
+    const sh = _actorMap.get(actor)?.shadow;
+    const wg = global.windowGroup;
+    if (sh && actor.get_parent() === wg && sh.get_parent() === wg)
+        wg.set_child_below_sibling(sh, actor);
+}
+
 function attachWindowSignals(actor) {
     const win     = actor.metaWindow;
     const texture = actor.get_texture();
@@ -647,6 +724,13 @@ function attachWindowSignals(actor) {
     addConnection(actor,   'notify::size',  () => { if (actor.metaWindow) refreshRoundedCorners(actor); });
     if (texture)
         addConnection(texture, 'size-changed', () => { if (actor.metaWindow) refreshRoundedCorners(actor); });
+
+    // Frame geometry / tile / maximise state changed: refresh now and once more after mutter settles
+    const resync = () => { if (actor.metaWindow) { refreshRoundedCorners(actor); scheduleResync(actor); } };
+    addConnection(win, 'raised', () => { if (actor.metaWindow) fixShadowOrder(actor); });
+    addConnection(win, 'size-changed',                   resync);
+    addConnection(win, 'notify::maximized-horizontally', resync);
+    addConnection(win, 'notify::maximized-vertically',   resync);
 
     // Fullscreen state changed (may not cause a size change)
     addConnection(win, 'notify::fullscreen',     () => { if (actor.metaWindow) refreshRoundedCorners(actor); });
@@ -705,6 +789,33 @@ function enableEffect() {
             // unconditionally; shouldSkip() already tolerates null wmClass.
             applyEffectTo(actor);
         });
+
+    // Debug: shadow state around an interactive move (why does the shadow vanish while dragging?)
+    const dbgDrag = (tag, actor) => {
+        const d = _actorMap.get(actor), sh = d?.shadow;
+        if (!sh) return;
+        const wg = global.windowGroup, kids = wg.get_children();
+        const inner = sh.get_first_child();
+        logDbg(`DRAG ${tag} ${actor.metaWindow?.get_wm_class()}: shadow visible=${sh.visible} opacity=${sh.opacity} mapped=${sh.mapped} ` +
+            `alloc=${sh.x},${sh.y} ${sh.width}x${sh.height} inner="${(inner?.style ?? '').replace(/\s+/g, ' ').slice(0, 90)}" ` +
+            `stack shadow=${kids.indexOf(sh)} actor=${kids.indexOf(actor)} of ${kids.length} effects=${sh.get_effects?.().length ?? '?'}`);
+    };
+    addConnection(global.display, 'grab-op-begin', (_d, win) => {
+        const actor = win?.get_compositor_private?.();
+        if (!actor || !getB('debug-mode') || !_actorMap.has(actor)) return;
+        dbgDrag('begin', actor);
+        for (const ms of [120, 600])
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => { if (_actorMap.has(actor)) dbgDrag(`+${ms}ms`, actor); return GLib.SOURCE_REMOVE; });
+    });
+
+    // End of an interactive move/resize (e.g. untiling by dragging): re-sync that window's shadow
+    addConnection(global.display, 'grab-op-end', (_d, win) => {
+        const actor = win?.get_compositor_private?.();
+        if (actor && _actorMap.has(actor)) {
+            if (getB('debug-mode')) dbgDrag('end', actor);
+            refreshRoundedCorners(actor); scheduleResync(actor);
+        }
+    });
 
     // Window closed
     addConnection(global.windowManager, 'destroy',
@@ -797,6 +908,7 @@ export default class RoundedWindowCornersExtension extends Extension {
         this.#startRefocus();
         this.#startTopBar();
         this.#startGap();
+        this.#startPopupDismiss();
         this.#startOverviewTweaks();
         this.#startQsLayout();
     }
@@ -853,6 +965,28 @@ export default class RoundedWindowCornersExtension extends Extension {
             console.error(`Knomadic Window Gap failed to stop cleanly: ${e}`);
         }
         this.#gap = null;
+    }
+
+    // ── Click-outside dismissal of the file-manager prompts (see popup/popupDismiss.js) ──
+    #popupDismiss = null;
+
+    #startPopupDismiss() {
+        try {
+            this.#popupDismiss = new PopupDismiss();
+            this.#popupDismiss.enable();
+        } catch (e) {
+            console.error(`Knomadic popup dismiss failed to start: ${e}`);
+            this.#popupDismiss = null;
+        }
+    }
+
+    #stopPopupDismiss() {
+        try {
+            this.#popupDismiss?.disable();
+        } catch (e) {
+            console.error(`Knomadic popup dismiss failed to stop cleanly: ${e}`);
+        }
+        this.#popupDismiss = null;
     }
 
     // ── Top Bar (merged from Dash to Panel, see topbar/). Off until 'topbar-enabled' is set AND Dash to Panel is disabled ──
@@ -930,6 +1064,7 @@ export default class RoundedWindowCornersExtension extends Extension {
     #startOverviewTweaks() {
         try {
             this.#hideTopBarInOverview();
+            logDbg(`OVERVIEW top-bar fade hooked (own topBar=${!!this.#topBar}, d2p panels=${global.dashToPanel?.panels?.length ?? 'none'})`);
         } catch (e) {
             logDbg(`top-bar tweak failed: ${e}`);
         }
@@ -939,6 +1074,19 @@ export default class RoundedWindowCornersExtension extends Extension {
             const sync = () => { entry.opacity = text.text ? 255 : 0; };
             this.#searchTextId = text.connect('text-changed', sync);
             sync();
+            if (getB('debug-mode')) {
+                const wid = entry.connect('notify::opacity', () => {
+                    if (Main.overview.visible)
+                        logDbg(`OVERVIEW search-entry opacity changed to ${entry.opacity} by: ${new Error().stack.split('\n').slice(1, 6).join(' | ')}`);
+                });
+                const sid = Main.overview.connect('shown', () => {
+                    const bin = Main.overview._overview?._controls?._searchEntryBin;
+                    logDbg(`OVERVIEW search-entry when shown: entry opacity=${entry.opacity} visible=${entry.visible} mapped=${entry.mapped} ` +
+                        `bin opacity=${bin?.opacity} bin h=${bin?.height} bin parent=${bin?.get_parent()}`);
+                });
+                this.#layoutPatches.push(() => { entry.disconnect(wid); Main.overview.disconnect(sid); });
+            }
+            logDbg(`OVERVIEW search-entry hooked (entry=${entry?.constructor?.name}, opacity=${entry.opacity})`);
         } catch (e) {
             logDbg(`search-entry tweak failed: ${e}`);
         }
@@ -1014,13 +1162,41 @@ export default class RoundedWindowCornersExtension extends Extension {
                 };
                 return walk(Main.layoutManager.uiGroup);
             };
-            const scaleDock = scale => {
+            // dhruva's layout engine re-applies dockUI.actor.set_scale(layoutScale) on every layout pass, which silently undid our
+            // ease (the dock stayed full size in the Overview). Wrap the dock's set_scale (instance method) so our overview factor is
+            // multiplied into whatever scale dhruva asks for; ease towards base*factor. dhruva keeps owning the pivot point.
+            const patchDock = dock => {
+                if (dock._knomadicFactor !== undefined)
+                    return;
+                dock._knomadicFactor = 1;
+                dock._knomadicOrigSetScale = dock.set_scale;
+                dock.set_scale = (sx, sy) => dock._knomadicOrigSetScale.call(dock, sx * dock._knomadicFactor, sy * dock._knomadicFactor);
+            };
+            const unpatchDock = dock => {
+                if (dock?._knomadicFactor === undefined)
+                    return;
+                dock.remove_all_transitions();
+                const f = dock._knomadicFactor;
+                delete dock.set_scale;
+                delete dock._knomadicOrigSetScale;
+                delete dock._knomadicFactor;
+                dock.set_scale(dock.scale_x / f, dock.scale_y / f);
+            };
+            const scaleDock = factor => {
                 const dock = findDock();
+                logDbg(`OVERVIEW dock scale ${factor}: ${dock ? 'DhruvaContainer found' : 'DhruvaContainer NOT FOUND'}`);
                 if (!dock)
                     return;
-                dock.set_pivot_point(0.5, 1.0);
+                patchDock(dock);
+                const baseX = dock.scale_x / dock._knomadicFactor, baseY = dock.scale_y / dock._knomadicFactor;
+                dock._knomadicFactor = factor;
                 dock.remove_all_transitions();
-                dock.ease({ scale_x: scale, scale_y: scale, duration: 250, mode: Clutter.AnimationMode.EASE_OUT_QUAD });
+                dock.ease({ scale_x: baseX * factor, scale_y: baseY * factor, duration: 250, mode: Clutter.AnimationMode.EASE_OUT_QUAD });
+                if (getB('debug-mode'))
+                    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 600, () => {
+                        logDbg(`OVERVIEW dock after 600ms: scale=${dock.scale_x.toFixed(3)} factor=${dock._knomadicFactor} pivot=${dock.pivot_point.x.toFixed(2)},${dock.pivot_point.y.toFixed(2)}`);
+                        return GLib.SOURCE_REMOVE;
+                    });
             };
             const ids = [
                 Main.overview.connect('showing', () => scaleDock(OVERVIEW_DOCK_SCALE)),
@@ -1028,12 +1204,9 @@ export default class RoundedWindowCornersExtension extends Extension {
             ];
             this.#layoutPatches.push(() => {
                 ids.forEach(i => Main.overview.disconnect(i));
-                const dock = findDock();
-                if (dock) {
-                    dock.remove_all_transitions();
-                    dock.set_scale(1, 1);
-                }
+                unpatchDock(findDock());
             });
+            logDbg('OVERVIEW layout/dock/work-area hooks installed');
         } catch (e) {
             logDbg(`overview layout tweak failed: ${e}`);
         }
@@ -1052,6 +1225,7 @@ export default class RoundedWindowCornersExtension extends Extension {
                 origShow.apply(this, args);
                 this._title.hide();
             };
+            logDbg('OVERVIEW window-preview icon/title hooks installed');
         } catch (e) {
             logDbg(`window-icon tweak failed: ${e}`);
         }
@@ -1065,16 +1239,33 @@ export default class RoundedWindowCornersExtension extends Extension {
             ? [Main.layoutManager.panelBox]
             : (global.dashToPanel?.panels ?? []).map(p => p.panelBox).filter(Boolean);
         const fade = (opacity, reactive) => boxes().forEach(b => {
+            logDbg(`OVERVIEW top-bar fade to ${opacity} on ${b}`);
             b.remove_transition('opacity');
             b.reactive = reactive;
             b.ease({ opacity, duration: 200, mode: Clutter.AnimationMode.EASE_OUT_QUAD });
         });
+        const dbgBoxes = () => {
+            if (!getB('debug-mode')) return;
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 500, () => {
+                boxes().forEach(b => logDbg(`OVERVIEW top-bar 500ms after showing: ${b} opacity=${b.opacity} visible=${b.visible} mapped=${b.mapped} ` +
+                    `parent=${b.get_parent()} panelBox===layoutManager.panelBox:${b === Main.layoutManager.panelBox}`));
+                return GLib.SOURCE_REMOVE;
+            });
+        };
+        const watch = [];
+        if (getB('debug-mode'))
+            for (const b of boxes())
+                watch.push([b, b.connect('notify::opacity', () => {
+                    if (Main.overview.visible)
+                        logDbg(`OVERVIEW top-bar opacity changed to ${b.opacity} by: ${new Error().stack.split('\n').slice(1, 6).join(' | ')}`);
+                })]);
         const ids = [
-            Main.overview.connect('showing', () => fade(0, false)),
+            Main.overview.connect('showing', () => { fade(0, false); dbgBoxes(); }),
             Main.overview.connect('hiding', () => fade(255, true)),
         ];
         this.#layoutPatches.push(() => {
             ids.forEach(i => Main.overview.disconnect(i));
+            watch.forEach(([b, id]) => b.disconnect(id));
             boxes().forEach(b => { b.remove_transition('opacity'); b.opacity = 255; b.reactive = true; });
         });
     }
@@ -1116,6 +1307,15 @@ export default class RoundedWindowCornersExtension extends Extension {
                     this.#lastFocus = display.focus_window;
             })]);
             const wm = global.window_manager;
+            // tile/resize: after a tile (mutter reports it as a size change) the tiled window can leave the pointer over a window that was underneath it,
+            // but sloppy focus only reacts to pointer MOTION, so focus would stay on the tiled window
+            this.#refocusIds.push([wm, wm.connect('size-changed', (_wm, actor) => {
+                try {
+                    this.#onWindowResized(actor);
+                } catch (e) {
+                    logDbg(`refocus error: ${e}`);
+                }
+            })]);
             for (const sig of ['destroy', 'minimize']) {
                 this.#refocusIds.push([wm, wm.connect(sig, (_wm, actor) => {
                     try {
@@ -1143,6 +1343,26 @@ export default class RoundedWindowCornersExtension extends Extension {
 
     #onWindowGone(actor) {
         const gone = actor?.meta_window;
+        if (gone && [Meta.WindowType.POPUP_MENU, Meta.WindowType.DROPDOWN_MENU, Meta.WindowType.MENU, Meta.WindowType.COMBO].includes(gone.get_window_type())) {
+            // a context menu closed: its grab kept the pointer from entering the window it was moved onto, and sloppy focus only reacts to motion,
+            // so focus the window under the pointer (only when the focused window no longer covers it)
+            if (this.#refocusTimer)
+                GLib.source_remove(this.#refocusTimer);
+            this.#refocusTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 60, () => {
+                this.#refocusTimer = 0;
+                try {
+                    const f = global.display.focus_window;
+                    const [px, py] = global.get_pointer();
+                    const r = f?.get_frame_rect();
+                    if (!r || px < r.x || px >= r.x + r.width || py < r.y || py >= r.y + r.height)
+                        this.#refocusUnderPointer(null, true);
+                } catch (e) {
+                    logDbg(`refocus error: ${e}`);
+                }
+                return GLib.SOURCE_REMOVE;
+            });
+            return;
+        }
         if (!gone || gone !== this.#lastFocus)
             return;
         if (gone.get_window_type() !== Meta.WindowType.NORMAL || gone.get_transient_for())
@@ -1161,7 +1381,31 @@ export default class RoundedWindowCornersExtension extends Extension {
         });
     }
 
-    #refocusUnderPointer(gone) {
+    #onWindowResized(actor) {
+        const w = actor?.meta_window;
+        if (!w || w !== global.display.focus_window)
+            return;
+        if (w.get_window_type() !== Meta.WindowType.NORMAL || w.get_transient_for())
+            return;
+        if (this.#refocusTimer)
+            GLib.source_remove(this.#refocusTimer);
+        this.#refocusTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 150, () => {
+            this.#refocusTimer = 0;
+            try {
+                // only when the focused window no longer covers the pointer, and only onto a window that IS under it (never onto the desktop/top window)
+                const [px, py] = global.get_pointer();
+                const r = w.get_frame_rect();
+                const inside = px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height;
+                if (!inside && w === global.display.focus_window)
+                    this.#refocusUnderPointer(w, true);
+            } catch (e) {
+                logDbg(`refocus error: ${e}`);
+            }
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    #refocusUnderPointer(gone, strict = false) {
         if (Main.overview.visible)
             return;
         const ws = global.workspace_manager.get_active_workspace();
@@ -1180,7 +1424,7 @@ export default class RoundedWindowCornersExtension extends Extension {
                 break;
             }
         }
-        if (!target)
+        if (!target && !strict)
             target = wins[wins.length - 1] ?? null;
         if (target && target !== global.display.focus_window)
             target.activate(global.get_current_time());
@@ -1230,6 +1474,7 @@ export default class RoundedWindowCornersExtension extends Extension {
         this.#stopQsLayout();
         this.#stopOverviewTweaks();
         this.#stopGap();
+        this.#stopPopupDismiss();
         this.#stopTheme();
         this.#stopTopBar();
         this.#stopRefocus();

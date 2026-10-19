@@ -22,4 +22,4 @@
 ) &
 disown
 
-exec /usr/bin/konsole -stylesheet /home/blank/.themes/dolphin-theme/dolphin-theme.qss "$@"
+exec env -u QT_QPA_PLATFORMTHEME QT_STYLE_OVERRIDE=Breeze LD_PRELOAD="$HOME/.themes/qt-fm/libqt-fm.so:$HOME/.themes/qt-noicons/libqt-noicons.so" /usr/bin/konsole -stylesheet "$HOME/.themes/qt-fm/qt-general.qss" "$@"

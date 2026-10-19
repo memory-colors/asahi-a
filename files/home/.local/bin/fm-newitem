@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+# fm-newitem file|dir - Thunar custom action helper (cwd = the folder). Small themed name prompt (GTK3, GTK_THEME=fm-sample), pre-filled with the first free "untitled.txt" / "New Folder";
+# a taken name (suggested or typed) becomes "name (1)", "name (2)", ... (before the extension for files). Enter creates, Esc cancels. (Click-outside dismissal is not done here: focus-based dismissal misfires under sloppy focus.)
+import sys, os, gi
+from gi.repository import GLib as _GL
+_GL.set_prgname('fm-newitem')                              # Wayland app id: the shell extension (popup/popupDismiss.js) closes this window on a click outside it
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, GLib
+kind = sys.argv[1] if len(sys.argv) > 1 else 'file'
+default, title = ('untitled.txt', 'New File') if kind == 'file' else ('New Folder', 'New Folder')
+
+def free(n):
+    if not os.path.lexists(n):
+        return n
+    base, ext = n, ''
+    if kind == 'file' and '.' in n.lstrip('.'):
+        base, ext = n.rsplit('.', 1)
+        ext = '.' + ext
+    i = 1
+    while os.path.lexists('%s (%d)%s' % (base, i, ext)):
+        i += 1
+    return '%s (%d)%s' % (base, i, ext)
+
+d = Gtk.Dialog(title=title)
+d.set_position(Gtk.WindowPosition.CENTER)
+d.set_keep_above(True)
+d.set_resizable(False)
+d.set_decorated(False)                                     # popup-like: no titlebar strip
+entry = Gtk.Entry(text=free(default), width_chars=30, activates_default=True)
+entry.set_margin_start(12); entry.set_margin_end(12); entry.set_margin_top(18); entry.set_margin_bottom(10)
+box = d.get_content_area(); box.set_border_width(0); box.pack_start(entry, True, True, 0)
+d.get_action_area().set_border_width(4)  # noqa
+d.add_button('Cancel', Gtk.ResponseType.CANCEL)
+d.add_button('Create', Gtk.ResponseType.OK)
+d.set_default_response(Gtk.ResponseType.OK)
+
+d.show_all()
+stem = len(entry.get_text()) - (len(entry.get_text().rsplit('.', 1)[1]) + 1 if kind == 'file' and '.' in entry.get_text().lstrip('.') else 0)
+GLib.idle_add(lambda: (entry.grab_focus(), entry.select_region(0, stem), False)[2])
+
+if os.environ.get('FM_NEWITEM_TEST'):                     # test hook: optional screenshot, then confirm
+    def snap():
+        shot = os.environ.get('FM_NEWITEM_SHOT')
+        if shot:
+            import cairo
+            a = d.get_allocation(); s = cairo.ImageSurface(cairo.FORMAT_ARGB32, a.width, a.height); d.draw(cairo.Context(s)); s.write_to_png(shot)
+        d.response(Gtk.ResponseType.OK); return False
+    GLib.timeout_add(1000, snap)
+
+resp = d.run()
+name = entry.get_text().strip()
+d.destroy()
+if resp != Gtk.ResponseType.OK or not name or '/' in name:
+    sys.exit(0)
+name = free(name)
+if kind == 'file':
+    open(name, 'a').close()
+else:
+    os.mkdir(name)

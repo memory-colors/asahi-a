@@ -142,23 +142,23 @@ StWidget:selected {
    today has one, so this bare rule is safe and the companion rule below keeps
    today's accent circle (it must come AFTER and be !important to win the tie). */
 .calendar .calendar-day {
-    background-color: #23232a !important;
+    background-color: #27272f !important;
 }
 .calendar .calendar-day.calendar-today {
     background-color: #5a3e8b !important;
 }
 /* BEGIN calendar-headers (set-shell-color.sh role calendar-headers) */
 /* Month label pill, prev/next arrows and weekday letters (S M T W T F S). Stock
-   groups all three with the day-number pills under one #35353f rule; kept as its
+   groups all three with the day-number pills under one #565663 rule; kept as its
    own role, independent of calendar-buttons (ported from the Debian setup). */
 .calendar .calendar-day-heading {
-    background-color: #35353f !important;
+    background-color: #565663 !important;
 }
 .calendar .calendar-month-header .calendar-month-label {
-    background-color: #35353f !important;
+    background-color: #565663 !important;
 }
 .calendar .calendar-month-header .pager-button {
-    background-color: #35353f !important;
+    background-color: #565663 !important;
 }
 /* END calendar-headers */
 /* Calendar banners - date header, "Today / No Events" box (.events-button),
@@ -168,7 +168,23 @@ StWidget:selected {
 .world-clocks-button,
 .events-button,
 .weather-button {
-    background-color: #464651 !important;
+    background-color: #33333c !important;
+}
+
+/* Brighter banner text (date header + world clocks/events/weather), #f0f0f0 */
+.datemenu-today-button,
+.datemenu-today-button .day-label,
+.datemenu-today-button .date-label,
+.world-clocks-button,
+.events-button,
+.weather-button,
+.events-button .events-box .events-title,
+.events-button .events-box .events-list .event-box .event-time,
+.events-button .events-box .events-list .event-placeholder,
+.world-clocks-button .world-clocks-header,
+.world-clocks-button .world-clocks-grid .world-clocks-timezone,
+.weather-button .weather-box .weather-header-box .weather-header {
+    color: #f0f0f0;
 }
 
 /* Active split-toggle arrow */

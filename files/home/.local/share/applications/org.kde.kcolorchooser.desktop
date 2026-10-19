@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Exec=kcolorchooser -stylesheet /home/blank/.themes/qt6ct/qss/kcolorchooser.qss
+Exec=env QT_QPA_PLATFORM=xcb kcolorchooser
 Icon=kcolorchooser
 X-DocPath=fundamentals/index.html#colors
 GenericName=Color Chooser

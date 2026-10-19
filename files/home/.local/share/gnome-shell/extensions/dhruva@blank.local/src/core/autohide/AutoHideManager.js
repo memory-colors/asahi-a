@@ -318,6 +318,10 @@ export default class AutoHideManager {
             return;
         }
 
+        if (this._isHovered && !this._isPointerOverDockOrTrigger()) {
+            this._isHovered = false;
+        }
+
         if (this._isHovered) {
             this.showWithDelay();
             return;
@@ -355,6 +359,19 @@ export default class AutoHideManager {
         } else {
             this.showWithDelay();
         }
+    }
+
+    // A missed leave-event leaves _isHovered stuck true; trust the real pointer instead.
+    _isPointerOverDockOrTrigger() {
+        const [px, py] = global.get_pointer();
+        const actors = [this.dockUI?.actor, this.edgeDetection?.triggerActor];
+
+        return actors.some(actor => {
+            if (!actor || !isActorAlive(actor) || !actor.visible) return false;
+            const [ax, ay] = actor.get_transformed_position();
+            const [aw, ah] = actor.get_transformed_size();
+            return px >= ax && px < ax + aw && py >= ay && py < ay + ah;
+        });
     }
 
     forceHideImmediately() {

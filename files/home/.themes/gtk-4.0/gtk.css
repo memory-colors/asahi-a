@@ -2962,7 +2962,7 @@ headerbar windowcontrols button.minimize:active {
 headerbar.default-decoration {
   min-height: 32px;
   padding: 0;
-  background-color: #1f1f24;
+  /* background colour: owned by the KNOMADIC x11-titlebar block (set-gtk-titlebar-color.sh x11) */
   border: none;
   box-shadow: none;
 }
@@ -2977,11 +2977,20 @@ headerbar.default-decoration > windowhandle > box {
   box-shadow: none;
 }
 
+headerbar.default-decoration windowcontrols {
+  /* KNOMADIC: x11-frame-button-spacing - the real gap between traffic-light
+     buttons is this border-spacing (a GTK box gap property), NOT button
+     margin - margin stacks ON TOP of it. Was inheriting the generic 6px
+     from the bare `headerbar windowcontrols` rule above. 2026-10-11. */
+  border-spacing: 5px;
+  padding: 0 10px 0 12px;
+}
+
 headerbar.default-decoration windowcontrols button,
 headerbar.default-decoration windowcontrols menubutton {
   border: none;
-  min-width: 16px;
-  min-height: 16px;
+  min-width: 20px;
+  min-height: 20px;
   margin: 0;
   padding: 0;
 }
@@ -2994,11 +3003,21 @@ headerbar.default-decoration windowcontrols menubutton button {
 }
 
 headerbar.default-decoration windowcontrols button.close, headerbar.default-decoration windowcontrols button.maximize, headerbar.default-decoration windowcontrols button.minimize {
-  min-width: 16px;
-  min-height: 16px;
-  margin: 0 1px;
+  min-width: 20px;
+  min-height: 20px;
+  margin: 0 0 -2px;
   padding: 0;
 }
+
+/* KNOMADIC: x11-frame-traffic-lights BEGIN - box resized to 20px (2026-10-11
+   was 16px to avoid the 20px icon clipping into an egg shape; box now
+   matches the icon's native size 1:1, so no clipping and no shrink needed.
+   Matches the Qt CSD spec's ButtonWidth=20/ButtonSpacing=6. Drawn by the
+   mutter-x11-frames GTK4 helper for X11/XWayland windows (e.g. SMPlayer). */
+headerbar.default-decoration windowcontrols button.close, headerbar.default-decoration windowcontrols button.maximize, headerbar.default-decoration windowcontrols button.minimize {
+  background-size: 20px 20px;
+}
+/* KNOMADIC: x11-frame-traffic-lights END */
 
 .titlebar > box.left.horizontal,
 .titlebar > box.right.horizontal {
@@ -9105,3 +9124,42 @@ themeswitcher checkbutton.dark {
    than leave collateral effect on other apps (Tweaks) for no gain on the
    actual target. See gedit-titlebar-mystery-2026-09-26.md for the earlier,
    similarly-unresolved analogous case. */
+
+/* KNOMADIC: gtk-titlebar BEGIN - do not edit by hand, see set-gtk-titlebar-color.sh */
+window headerbar:not(.default-decoration),
+window headerbar:not(.default-decoration):backdrop {
+  background-color: #161618;
+  border-bottom: 1px solid mix(black,#161618,0.25);
+}
+/* KNOMADIC: gtk-titlebar END */
+
+/* KNOMADIC: text-editor-titlebar BEGIN - do not edit by hand, see set-text-editor-titlebar-color.sh */
+window.org-gnome-TextEditor headerbar,
+window.org-gnome-TextEditor headerbar:backdrop {
+  background-color: #18181b;
+  border-bottom: 1px solid mix(black,#18181b,0.25);
+}
+/* KNOMADIC: text-editor-titlebar END */
+
+/* KNOMADIC: text-editor-button-padding BEGIN - traffic-light left edge padding,
+   independent of the generic `headerbar windowcontrols { padding: 0 10px; }`
+   base rule (10px each side) - left side only, pulled in 3px. 2026-10-11. */
+window.org-gnome-TextEditor headerbar windowcontrols {
+  padding-left: 3px;
+}
+/* KNOMADIC: text-editor-button-padding END */
+
+/* KNOMADIC: text-editor-bg BEGIN - do not edit by hand, see set-text-editor-bg-color.sh */
+window.org-gnome-TextEditor textview,
+window.org-gnome-TextEditor textview > text {
+  background-color: #18181b;
+}
+/* KNOMADIC: text-editor-bg END */
+
+/* KNOMADIC: x11-titlebar BEGIN - do not edit by hand, see set-gtk-titlebar-color.sh */
+headerbar.default-decoration,
+headerbar.default-decoration:backdrop {
+  background-color: #161618;
+  border-bottom: 1px solid mix(black,#161618,0.25);
+}
+/* KNOMADIC: x11-titlebar END */

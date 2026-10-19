@@ -554,7 +554,9 @@ void QAdwaitaDecorations::paint(QPaintDevice *device)
         p.save();
         p.setPen(borderColor);
         p.fillPath(path.simplified(), backgroundColor);
-        p.drawPath(path);
+        // KNOMADIC: a tiled/maximized window has no margin on its tiled edges, so the 1px frame stroke landed on pixel 0 of the screen edge (grey line)
+        if (!(maximized || tiled))
+            p.drawPath(path);
         p.restore();
     }
 

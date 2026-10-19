@@ -1,22 +1,20 @@
 <?xml version="1.0"?>
 <application-state>
   <context id="">
-    <application id="claude-desktop-unofficial.desktop" score="11" last-seen="1791395531"/>
-    <application id="org.gnome.tweaks.desktop" score="42" last-seen="1791454486"/>
-    <application id="brave-browser.desktop" score="0" last-seen="0"/>
-    <application id="org.gnome.TextEditor.desktop" score="1178" last-seen="1791646778"/>
-    <application id="org.gnome.Shell.Extensions.desktop" score="390" last-seen="1791642355"/>
-    <application id="com.brave.Browser.desktop" score="185" last-seen="1791654842"/>
-    <application id="com.mattjakeman.ExtensionManager.desktop" score="26" last-seen="1791521112"/>
-    <application id="io.github.dnfui.dnfui.desktop" score="84" last-seen="1791345459"/>
-    <application id="smplayer.desktop" score="27" last-seen="1791453861"/>
-    <application id="com.interversehq.qView.desktop" score="19" last-seen="1791646871"/>
-    <application id="mullvad-vpn.desktop" score="0" last-seen="1791344716"/>
-    <application id="xdg-desktop-portal-gtk.desktop" score="0" last-seen="1791503317"/>
-    <application id="org.kde.konsole.desktop" score="2945" last-seen="1791655590"/>
-    <application id="org.kde.dolphin.desktop" score="242" last-seen="1791655603"/>
-    <application id="org.kde.kcolorchooser.desktop" score="41" last-seen="1791642256"/>
-    <application id="org.gnome.Settings.desktop" score="13" last-seen="1791519191"/>
-    <application id="restart-to-macos.desktop" score="0" last-seen="0"/>
+    <application id="org.gnome.TextEditor.desktop" score="73" last-seen="1792438663"/>
+    <application id="thunar.desktop" score="1552" last-seen="1792446076"/>
+    <application id="org.gnome.Shell.Extensions.desktop" score="182" last-seen="1792415869"/>
+    <application id="brave-geijiaoeofpopobjcbeafpacnjmhilfn-Default.desktop" score="72" last-seen="1792346373"/>
+    <application id="com.brave.Browser.desktop" score="317" last-seen="1792333198"/>
+    <application id="com.mattjakeman.ExtensionManager.desktop" score="1" last-seen="1792333229"/>
+    <application id="com.interversehq.qView.desktop" score="7" last-seen="1792438661"/>
+    <application id="smplayer.desktop" score="241" last-seen="1792445491"/>
+    <application id="nemo.desktop" score="99" last-seen="1792118059"/>
+    <application id="veracrypt.desktop" score="0" last-seen="1792438642"/>
+    <application id="xdg-desktop-portal-gtk.desktop" score="0" last-seen="1792030848"/>
+    <application id="org.kde.konsole.desktop" score="6476" last-seen="1792446051"/>
+    <application id="org.kde.kcolorchooser.desktop" score="36" last-seen="1792346769"/>
+    <application id="org.gnome.Settings.desktop" score="0" last-seen="1792115957"/>
+    <application id="org.kde.ark.desktop" score="0" last-seen="1792328856"/>
   </context>
 </application-state>

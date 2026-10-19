@@ -320,7 +320,11 @@ EXCLUDES=(
 )
 for homedir in /home/*/; do
     user="$(basename "$homedir")"
-    EXCLUDES+=("home/${user}/.cache/*" "home/${user}/.claude" "home/${user}/.local/share/claude" "home/${user}/.local/bin/claude" "home/${user}/Software/asahi_atomic/*.log" "home/${user}/Software/asahi_atomic/backups/*")
+    # Claude Code (.claude config/session + .local/share/claude + .local/bin/claude) is
+    # TEMPORARILY kept in the image (not excluded) for on-B audio diagnosis - see handoff
+    # note on /persist. Revert by re-adding those three paths here once diagnosis is done -
+    # standing policy is no Claude Code on B (asahi_atomic memory).
+    EXCLUDES+=("home/${user}/.cache/*" "home/${user}/Software/asahi_atomic/*.log" "home/${user}/Software/asahi_atomic/backups/*")
     # Brave stores its own regenerable browser cache under ~/.config instead of
     # respecting ~/.cache - found via a real ~184MB hit in a squash build (2026-09-21).
     # Cache only, never profile/bookmarks/history/passwords - safe to exclude entirely.
@@ -495,7 +499,7 @@ rm -f "$SQUASH_IMG"
 
 mksquashfs / "$SQUASH_IMG" \
     -noappend \
-    -comp zstd -Xcompression-level 15 \
+    -comp zstd -Xcompression-level 3 \
     -processors "$(nproc)" \
     "${MKSQUASHFS_P_ARGS[@]}" \
     -wildcards \
@@ -713,6 +717,28 @@ mount -o subvolid=5 "$ROOT_PART" "$TMPROOT"
 mkdir -p "$TMPROOT/LiveOS"
 cp -f "$SQUASH_IMG" "$TMPROOT/LiveOS/squashfs.img"
 umount "$TMPROOT"
+
+# Step 7: refresh B's own ESP firmware blob (m1n1+devicetree+u-boot) to match
+# whatever kernel A is currently running. B's ESP is never reformatted (PARTUUID
+# is permanent, see gotcha #11) but its firmware blob IS safe to rewrite in place -
+# update-m1n1 does that, same as the kernel-install hook does for A's own ESP on
+# every kernel change. Without this, B's devicetree-derived audio topology can go
+# stale relative to the kernel actually running (confirmed real: snd-soc-macaudio
+# failed to probe -22, TAS2764 woofer amp never appeared, because B's ESP still had
+# the DTB from its original asahi-installer provisioning - audio-specific case of
+# the firmware/kernel co-versioning risk in gotcha #19; fixed manually once
+# 2026-10-11, now done automatically here on every rebuild).
+ESP_PART="$(lsblk -rno PATH,PARTLABEL | awk '$2=="atomic-esp"{print $1; exit}')"
+if [ -n "$ESP_PART" ]; then
+    echo "Refreshing B's ESP firmware (update-m1n1) on $ESP_PART..."
+    TMPESP="$(mktemp -d)"
+    mount "$ESP_PART" "$TMPESP"
+    update-m1n1 "$TMPESP/m1n1/boot.bin"
+    umount "$TMPESP"
+    rmdir "$TMPESP"
+else
+    echo "WARNING: could not find B's ESP (PARTLABEL atomic-esp) - skipping m1n1 firmware refresh. Audio (and possibly other devicetree-dependent hardware) may be stale on B after this rebuild if A's kernel has changed since B's ESP was last refreshed." >&2
+fi
 
 # Remember which partitions this run targeted (by PARTUUID, so it still
 # resolves correctly even if /dev/nvme0n1pN numbers shift later) so the next
