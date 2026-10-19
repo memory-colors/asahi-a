@@ -2,7 +2,7 @@
 <application-state>
   <context id="">
     <application id="org.gnome.TextEditor.desktop" score="73" last-seen="1792438663"/>
-    <application id="thunar.desktop" score="1552" last-seen="1792446076"/>
+    <application id="thunar.desktop" score="1557" last-seen="1792446409"/>
     <application id="org.gnome.Shell.Extensions.desktop" score="182" last-seen="1792415869"/>
     <application id="brave-geijiaoeofpopobjcbeafpacnjmhilfn-Default.desktop" score="72" last-seen="1792346373"/>
     <application id="com.brave.Browser.desktop" score="317" last-seen="1792333198"/>
@@ -12,7 +12,7 @@
     <application id="nemo.desktop" score="99" last-seen="1792118059"/>
     <application id="veracrypt.desktop" score="0" last-seen="1792438642"/>
     <application id="xdg-desktop-portal-gtk.desktop" score="0" last-seen="1792030848"/>
-    <application id="org.kde.konsole.desktop" score="6476" last-seen="1792446051"/>
+    <application id="org.kde.konsole.desktop" score="6572" last-seen="1792446859"/>
     <application id="org.kde.kcolorchooser.desktop" score="36" last-seen="1792346769"/>
     <application id="org.gnome.Settings.desktop" score="0" last-seen="1792115957"/>
     <application id="org.kde.ark.desktop" score="0" last-seen="1792328856"/>

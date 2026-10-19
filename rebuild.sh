@@ -47,11 +47,12 @@ done
 # or reported as UNCLASSIFIED (new top-level dirs in ~, ~/.config, ~/.local/share): add it to a list below.
 # ---------------------------------------------------------------------------------------------------------------
 PUBLIC_DIRS=(.bashrc.d .themes .local/bin
-    .local/share/applications .local/share/dolphin .local/share/fonts .local/share/gnome-shell .local/share/icons .local/share/konsole
+    .local/share/applications .local/share/fonts .local/share/gnome-shell .local/share/icons .local/share/konsole
     .config/{autostart,bleachbit,czkawka,dhruva@blank.local,environment.d,gtk-3.0,gtk-4.0,ibus,ksnip,menus,plasma-workspace}
-    .config/{qView,qt5ct,qt6ct,ristretto,smplayer,VeraCrypt,viewnior,xdg-desktop-portal,xfce4})
+    .config/{qView,ristretto,smplayer,Thunar,VeraCrypt,viewnior,xdg-desktop-portal,xfce4}
+    .config/{fm-fonts,fm-tweaks})
 PUBLIC_FILES=(.bashrc
-    .config/{.gsd-keyboard.settings-ported,baloofileinformationrc,dnfdragora.yaml,dnfui.conf,dolphinrc,gnome-initial-setup-done}
+    .config/{.gsd-keyboard.settings-ported,arkrc,baloofileinformationrc,dnfdragora.yaml,dnfui.conf,fm-menu-hide.txt,gnome-initial-setup-done}
     .config/{kdeglobals,kglobalshortcutsrc,khotkeysrc,kiorc,konsole.kmessagebox,konsolerc,kservicemenurc,ktrashrc}
     .config/{mimeapps.list,monitors.xml,qwhitesurgtkdecorations.conf,user-dirs.dirs,user-dirs.locale}
     ".config/Mullvad VPN/gui_settings.json" .config/LosslessCut/config.json)
@@ -59,13 +60,13 @@ PUBLIC_SOFTWARE=(asahi_atomic "Toggl_*" "lt_grey*")      # globs inside ~/Softwa
 SKIP_SOFTWARE=(czkawka-gui asahi-a)                             # downloaded by the apps phase
 # excluded from the rsync of PUBLIC_DIRS (patterns match at any depth): private, absolute symlinks are dropped by --safe-links
 SYNC_EXCLUDES=(.git original-upstream-extensions __pycache__ '*.bak*' '*.pyc' rEFInd-install.desktop view_properties extensions-bak extension-updates 'SF-*' claude losslesscut)
-PRIVATE_PATHS=(.ssh .claude Downloads Screenshots
+PRIVATE_PATHS=(.ssh .gnupg .claude Downloads Screenshots
     .local/share/keyrings .local/share/pki .local/share/evolution .local/share/applications/rEFInd-install.desktop
     ".config/Mullvad VPN" .config/transmission .config/evolution .config/BraveSoftware .config/Claude .config/gh .config/konsolesshconfig
     .local/share/fonts/SF-Compact-static .local/share/fonts/SF-Pro-static)       # + loose files in ~ (except .bashrc, .index)
 PRIVATE_SYSTEM=(etc/NetworkManager/system-connections etc/mullvad-vpn var/lib/AccountsService/users/$TARGET_USER var/lib/AccountsService/icons/$TARGET_USER
     usr/share/icons/{MacTahoe-nord,MacTahoe-nord-dark,WhiteSur-grey,Bibata-Modern-Ice,breeze_cursors})
-SKIP_PATHS=(.cache .var .index .local/share/{LosslessCut,claude,Trash,baloo,flatpak,folks,glib-2.0,gnome-settings-daemon,gnome-software}
+SKIP_PATHS=(.cache .var .index .config/{fm-cfg,nemo} .local/share/{ark,nemo,LosslessCut,claude,Trash,baloo,flatpak,folks,glib-2.0,gnome-settings-daemon,gnome-software}
     .local/share/{gvfs-metadata,icc,kio,locale,metainfo,nautilus,org.gnome.TextEditor,recently-used.xbel,user-places.xbel}
     .local/share/{backgrounds,color-schemes,desktop-directories,gtksourceview-5,kservices5,kxmlgui5,pixmaps,sounds}
     .config/{dconf,enchant,goa-1.0,imsettings,mpv,pulse,LosslessCut} .local/bin/claude)

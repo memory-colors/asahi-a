@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+<action>
+	<icon>edit-copy</icon>
+	<name>Copy Location</name>
+	<submenu></submenu>
+	<unique-id>1792200000000000-1</unique-id>
+	<command>env -u LD_PRELOAD -u GTK_THEME sh -c 'for f; do echo "$f"; done | wl-copy -n' sh %F</command>
+	<description>Copy the full path(s) to the clipboard (needs wl-clipboard)</description>
+	<range>*</range>
+	<patterns>*</patterns>
+	<startup-notify/>
+	<directories/>
+	<audio-files/>
+	<image-files/>
+	<other-files/>
+	<text-files/>
+	<video-files/>
+</action>
+<action>
+	<icon>document-new</icon>
+	<name>New File</name>
+	<submenu></submenu>
+	<unique-id>1792200000000000-2</unique-id>
+	<command>env -u LD_PRELOAD GTK_THEME=fm-sample "$HOME/.local/bin/fm-newitem" file %F</command>
+	<description>Create an empty file in the current folder</description>
+	<range>*</range>
+	<patterns>*</patterns>
+	<startup-notify/>
+	<directories/>
+	<audio-files/>
+	<image-files/>
+	<other-files/>
+	<text-files/>
+	<video-files/>
+</action>
+<action>
+	<icon>edit-clear</icon>
+	<name>Shred</name>
+	<submenu></submenu>
+	<unique-id>1792200000000000-3</unique-id>
+	<command>env -u LD_PRELOAD -u GTK_THEME sh -c 'p=$PWD; for f; do shift; [ "$f" = "$p" ] || set -- "$@" "$f"; done; [ $# -gt 0 ] || { zenity --info --text="Select items to shred first."; exit 0; }; GTK_THEME=fm-sample "$HOME/.local/bin/fm-confirm" "Shred?" Shred || exit 0; if out=$(bleachbit --shred "$@" 2&gt;&amp;1); then zenity --info --title="Shred" --text="Done" --timeout=1; else zenity --error --title="Shred" --text="Shred failed:\n$out"; fi' sh %F</command>
+	<description>Overwrite and delete the selection with BleachBit (asks first)</description>
+	<range>*</range>
+	<patterns>*</patterns>
+	<startup-notify/>
+	<directories/>
+	<audio-files/>
+	<image-files/>
+	<other-files/>
+	<text-files/>
+	<video-files/>
+</action>
+<action>
+	<icon>folder-new</icon>
+	<name>New Folder</name>
+	<submenu></submenu>
+	<unique-id>1792200000000000-4</unique-id>
+	<command>env -u LD_PRELOAD GTK_THEME=fm-sample "$HOME/.local/bin/fm-newitem" dir %F</command>
+	<description>Create a folder in the current folder</description>
+	<range>*</range>
+	<patterns>*</patterns>
+	<startup-notify/>
+	<directories/>
+	<audio-files/>
+	<image-files/>
+	<other-files/>
+	<text-files/>
+	<video-files/>
+</action>
+<action>
+	<icon>utilities-terminal</icon>
+	<name>Open in Terminal</name>
+	<submenu></submenu>
+	<unique-id>1792200000000000-5</unique-id>
+	<command>env -u LD_PRELOAD -u GTK_THEME sh -c 'd=$1; [ -d "$d" ] || d=$PWD; exec konsole --workdir "$d"' sh %F</command>
+	<description>Konsole in the selected folder, else the current folder</description>
+	<range>*</range>
+	<patterns>*</patterns>
+	<startup-notify/>
+	<directories/>
+	<audio-files/>
+	<image-files/>
+	<other-files/>
+	<text-files/>
+	<video-files/>
+</action>
+<action>
+	<icon>edit-rename</icon>
+	<name>Rename</name>
+	<submenu></submenu>
+	<unique-id>1792200000000000-6</unique-id>
+	<command>env -u LD_PRELOAD -u GTK_THEME /home/blank/.local/bin/thunar-bulk-rename-tiled %F</command>
+	<description>Open the selection in Thunar's bulk renamer</description>
+	<range>2-</range>
+	<patterns>*</patterns>
+	<startup-notify/>
+	<directories/>
+	<audio-files/>
+	<image-files/>
+	<other-files/>
+	<text-files/>
+	<video-files/>
+</action>
+</actions>
