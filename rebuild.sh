@@ -56,17 +56,17 @@ PUBLIC_FILES=(.bashrc
     .config/{kdeglobals,kglobalshortcutsrc,khotkeysrc,kiorc,konsole.kmessagebox,konsolerc,kservicemenurc,ktrashrc}
     .config/{mimeapps.list,monitors.xml,qwhitesurgtkdecorations.conf,user-dirs.dirs,user-dirs.locale}
     ".config/Mullvad VPN/gui_settings.json" .config/LosslessCut/config.json)
-PUBLIC_SOFTWARE=(asahi_atomic fm-tweaks "Toggl_*" "lt_grey*")      # globs inside ~/Software; everything else there is PRIVATE
+PUBLIC_SOFTWARE=(asahi_atomic fm-tweaks "trust-desktop-files*" "Toggl_*" "lt_grey*")      # globs inside ~/Software; everything else there is PRIVATE
 SKIP_SOFTWARE=(czkawka-gui asahi-a)                             # downloaded by the apps phase
 # excluded from the rsync of PUBLIC_DIRS (patterns match at any depth): private, absolute symlinks are dropped by --safe-links
 SYNC_EXCLUDES=(.git original-upstream-extensions __pycache__ '*.bak*' '*.pyc' rEFInd-install.desktop view_properties extensions-bak extension-updates 'SF-*' claude losslesscut)
-PRIVATE_PATHS=(.ssh .gnupg .claude Downloads Screenshots
+PRIVATE_PATHS=(.ssh .gnupg .claude Downloads Screenshots .local/opt .local/libexec
     .local/share/keyrings .local/share/pki .local/share/evolution .local/share/applications/rEFInd-install.desktop
     ".config/Mullvad VPN" .config/transmission .config/evolution .config/BraveSoftware .config/Claude .config/gh .config/konsolesshconfig
     .local/share/fonts/SF-Compact-static .local/share/fonts/SF-Pro-static)       # + loose files in ~ (except .bashrc, .index)
 PRIVATE_SYSTEM=(etc/NetworkManager/system-connections etc/mullvad-vpn var/lib/AccountsService/users/$TARGET_USER var/lib/AccountsService/icons/$TARGET_USER
     usr/share/icons/{MacTahoe-nord,MacTahoe-nord-dark,WhiteSur-grey,Bibata-Modern-Ice,breeze_cursors})
-SKIP_PATHS=(.cache .var .index .config/{fm-cfg,nemo} .local/share/{ark,nemo,LosslessCut,claude,Trash,baloo,flatpak,folks,glib-2.0,gnome-settings-daemon,gnome-software}
+SKIP_PATHS=(.cache .var .index .local/state .config/{fm-cfg,nemo} .local/share/{ark,nemo,LosslessCut,claude,Trash,baloo,flatpak,folks,glib-2.0,gnome-settings-daemon,gnome-software}
     .local/share/{gvfs-metadata,icc,kio,locale,metainfo,nautilus,org.gnome.TextEditor,recently-used.xbel,user-places.xbel}
     .local/share/{backgrounds,color-schemes,desktop-directories,gtksourceview-5,kservices5,kxmlgui5,pixmaps,sounds}
     .config/{dconf,enchant,goa-1.0,imsettings,mpv,pulse,LosslessCut} .local/bin/claude)
@@ -85,12 +85,13 @@ classified() {   # classified REL: true if REL (or a path beneath it) appears in
 }
 unclassified_scan() {   # warn about new entries nobody has classified yet
     local d e rel n=0
-    for d in "" .config .local/share; do
+    for d in "" .config .local .local/share; do
         for e in "$TARGET_HOME/${d:+$d/}"* "$TARGET_HOME/${d:+$d/}".[!.]*; do
             [ -e "$e" ] || [ -L "$e" ] || continue
             rel=${e#"$TARGET_HOME"/}
             [ -z "$d" ] && [ ! -d "$e" ] && continue          # loose files in ~ are auto-archived
-            [ -z "$d" ] && case $rel in .config|.local|Software) continue ;; esac   # Software is classified per item (PUBLIC_SOFTWARE)
+            [ -z "$d" ] && case $rel in .config|.local|Software) continue ;; esac
+            [ "$d" = .local ] && case $rel in .local/share) continue ;; esac   # .local/share is scanned one level down   # Software is classified per item (PUBLIC_SOFTWARE)
             classified "$rel" || { warn "UNCLASSIFIED: ~/$rel  (add it to PUBLIC_*/PRIVATE_*/SKIP_* at the top of rebuild.sh)"; n=$((n+1)); }
         done
     done
