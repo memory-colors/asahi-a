@@ -14,4 +14,4 @@ The look itself is GENERATED: `bin/fm-tweaks apply` renders templates/thunar.css
 `bin/round-folder-icons` writes the rounded folder icons (user overlay of MacTahoe-nord-dark).
 What hooks.c does: label overrides, Ctrl+Right/Ctrl+Shift+Right copy/move to the other split pane, Tab pane switch, Ctrl+T toolbar toggle, dot-files-last sort,
 Shift+arrow range select with expandable folders, rounded/inset row highlight, and the 8-entry right-click menu (incl. "Menu >" borrowing the hidden menu bar).
-Full story: ~/Software/Claude/system-change-log_asahi_2026-10-16.txt and the Thunar section of the linux_theming memory note.
+Full story: the newest ~/Software/Claude/system-change-log_asahi_<date>.txt and the Thunar section of the linux_theming memory note.

@@ -1,19 +1,19 @@
 <?xml version="1.0"?>
 <application-state>
   <context id="">
-    <application id="org.gnome.TextEditor.desktop" score="73" last-seen="1792438663"/>
-    <application id="thunar.desktop" score="1557" last-seen="1792446409"/>
-    <application id="org.gnome.Shell.Extensions.desktop" score="182" last-seen="1792415869"/>
+    <application id="thunar.desktop" score="1757" last-seen="1792547446"/>
+    <application id="org.gnome.Shell.Extensions.desktop" score="193" last-seen="1792492312"/>
     <application id="brave-geijiaoeofpopobjcbeafpacnjmhilfn-Default.desktop" score="72" last-seen="1792346373"/>
-    <application id="com.brave.Browser.desktop" score="317" last-seen="1792333198"/>
+    <application id="com.brave.Browser.desktop" score="349" last-seen="1792547328"/>
+    <application id="org.gnome.TextEditor.desktop" score="100" last-seen="1792547063"/>
     <application id="com.mattjakeman.ExtensionManager.desktop" score="1" last-seen="1792333229"/>
     <application id="com.interversehq.qView.desktop" score="7" last-seen="1792438661"/>
     <application id="smplayer.desktop" score="241" last-seen="1792445491"/>
-    <application id="nemo.desktop" score="99" last-seen="1792118059"/>
+    <application id="brave-browser.desktop" score="0" last-seen="0"/>
     <application id="veracrypt.desktop" score="0" last-seen="1792438642"/>
-    <application id="xdg-desktop-portal-gtk.desktop" score="0" last-seen="1792030848"/>
-    <application id="org.kde.konsole.desktop" score="6572" last-seen="1792446859"/>
-    <application id="org.kde.kcolorchooser.desktop" score="36" last-seen="1792346769"/>
+    <application id="xdg-desktop-portal-gtk.desktop" score="0" last-seen="1792506041"/>
+    <application id="org.kde.kcolorchooser.desktop" score="39" last-seen="1792547438"/>
+    <application id="org.kde.konsole.desktop" score="8093" last-seen="1792547443"/>
     <application id="org.gnome.Settings.desktop" score="0" last-seen="1792115957"/>
     <application id="org.kde.ark.desktop" score="0" last-seen="1792328856"/>
   </context>

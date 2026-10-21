@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # fm-newitem file|dir - Thunar custom action helper (cwd = the folder). Small themed name prompt (GTK3, GTK_THEME=fm-sample), pre-filled with the first free "untitled.txt" / "New Folder";
 # a taken name (suggested or typed) becomes "name (1)", "name (2)", ... (before the extension for files). Enter creates, Esc cancels. (Click-outside dismissal is not done here: focus-based dismissal misfires under sloppy focus.)
-import sys, os, gi
+import sys, os, re, gi
 from gi.repository import GLib as _GL
 _GL.set_prgname('fm-newitem')                              # Wayland app id: the shell extension (popup/popupDismiss.js) closes this window on a click outside it
 gi.require_version('Gtk', '3.0')
@@ -16,7 +16,11 @@ def free(n):
     if kind == 'file' and '.' in n.lstrip('.'):
         base, ext = n.rsplit('.', 1)
         ext = '.' + ext
-    i = 1
+    m = re.match(r'^(.+) \(([1-9][0-9]{0,2}|0)\)$', base)    # "name (5)" goes on from its own number: (6), (7), ... the first free one above it (same rule as the patched Thunar)
+    if m:
+        base, i = m.group(1), int(m.group(2)) + 1
+    else:
+        i = 1
     while os.path.lexists('%s (%d)%s' % (base, i, ext)):
         i += 1
     return '%s (%d)%s' % (base, i, ext)
@@ -36,7 +40,15 @@ d.set_default_response(Gtk.ResponseType.OK)
 
 d.show_all()
 stem = len(entry.get_text()) - (len(entry.get_text().rsplit('.', 1)[1]) + 1 if kind == 'file' and '.' in entry.get_text().lstrip('.') else 0)
-GLib.idle_add(lambda: (entry.grab_focus(), entry.select_region(0, stem), False)[2])
+def pick(*_):                                              # (re)select the name once the window really has focus; before that GTK draws no selection and a later focus-in can reset it
+    entry.grab_focus(); entry.select_region(0, stem)
+    return False
+GLib.idle_add(pick)
+def on_active(w, _p):
+    if w.props.is_active:
+        GLib.idle_add(pick)
+d.connect('notify::is-active', on_active)
+entry.connect('focus-in-event', lambda *a: (GLib.idle_add(pick), False)[1])   # focus can arrive after the first selection and reset it
 
 if os.environ.get('FM_NEWITEM_TEST'):                     # test hook: optional screenshot, then confirm
     def snap():

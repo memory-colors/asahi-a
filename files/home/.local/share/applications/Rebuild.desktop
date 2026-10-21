@@ -2,7 +2,7 @@
 Type=Application
 Name=Rebuild
 Comment=Run rebuild script
-Exec=bash -c "sudo bash /home/blank/Software/asahi_atomic/rebuild-golden-b.sh; echo; read -p Done-press-Enter x"
+Exec=bash -c "sudo bash /home/blank/Software/asahi_atomic/rebuild-golden-b.sh && echo SCRIPT-EXITED-OK-check-for-Done-building-and-flashing-above || echo FAILED-or-ABORTED-B-NOT-UPDATED-read-the-messages-above; echo; read -p Press-Enter-to-close x"
 Icon=org.gnome.tweaks.svg
 Terminal=true
 Categories=Utility;

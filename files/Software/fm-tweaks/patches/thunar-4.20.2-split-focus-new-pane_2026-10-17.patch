@@ -4,7 +4,7 @@
          window->notebook_left = NULL;
        gtk_notebook_set_show_border (GTK_NOTEBOOK (window->notebook_selected), FALSE);
  
-+      /* the survivor always goes back to the left slot, so the next split opens its new pane on the right (like Dolphin)
++      /* the survivor always goes back to the left slot, so the next split opens its new pane on the right
 +       * instead of on whichever side happens to be free */
 +      if (window->notebook_left == NULL && window->notebook_right != NULL)
 +        {
@@ -31,7 +31,7 @@
  
 -      /* keep focus on the first notebook */
 -      thunar_window_paned_notebooks_switch (window);
-+      /* focus the new pane (like Dolphin) instead of switching back to the first notebook: the insert above
++      /* focus the new pane instead of switching back to the first notebook: the insert above
 +       * already made the new view the current one, so only the pane indication and the focus are left to do */
 +      thunar_window_paned_notebooks_indicate_focus (window, window->notebook_selected);
 +      gtk_widget_grab_focus (window->view);

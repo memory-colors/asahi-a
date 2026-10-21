@@ -11,7 +11,7 @@ References:
   4. https://developer.gnome.org/gtksourceview/stable/GtkSourceStyleScheme.html
 -->
 <style-scheme id="nord-titlebar" version="1.0" name="Nord (Titlebar BG)" kind="dark">
-  <description>An arctic, north-bluish clean and elegant gedit syntax theme.</description>
+  <description>An arctic, north-bluish clean and elegant syntax theme.</description>
 
   <color name="nord0" value="#1d1d20" />
   <color name="nord1" value="#3B4252" />

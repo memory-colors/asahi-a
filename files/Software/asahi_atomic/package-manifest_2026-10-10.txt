@@ -25,7 +25,6 @@ default-fonts-core-serif.noarch
 desktop-backgrounds-gnome.noarch
 dnf-ui.aarch64
 dnsmasq.aarch64
-dolphin.aarch64
 dracut-live.aarch64
 fedora-asahi-remix-release-workstation.noarch
 fedora-bookmarks.noarch
@@ -354,9 +353,6 @@ dnf-ui.aarch64
 dnsmasq.aarch64
 docbook-dtds.noarch
 docbook-style-xsl.noarch
-dolphin.aarch64
-dolphin-libs.aarch64
-dolphin-plugins.aarch64
 dotconf.aarch64
 double-conversion.aarch64
 dracut-live.aarch64

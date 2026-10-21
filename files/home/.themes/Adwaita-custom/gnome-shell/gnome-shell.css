@@ -142,23 +142,23 @@ StWidget:selected {
    today has one, so this bare rule is safe and the companion rule below keeps
    today's accent circle (it must come AFTER and be !important to win the tie). */
 .calendar .calendar-day {
-    background-color: #27272f !important;
+    background-color: #24242d !important;
 }
 .calendar .calendar-day.calendar-today {
     background-color: #5a3e8b !important;
 }
 /* BEGIN calendar-headers (set-shell-color.sh role calendar-headers) */
 /* Month label pill, prev/next arrows and weekday letters (S M T W T F S). Stock
-   groups all three with the day-number pills under one #565663 rule; kept as its
+   groups all three with the day-number pills under one #434451 rule; kept as its
    own role, independent of calendar-buttons (ported from the Debian setup). */
 .calendar .calendar-day-heading {
-    background-color: #565663 !important;
+    background-color: #434451 !important;
 }
 .calendar .calendar-month-header .calendar-month-label {
-    background-color: #565663 !important;
+    background-color: #434451 !important;
 }
 .calendar .calendar-month-header .pager-button {
-    background-color: #565663 !important;
+    background-color: #434451 !important;
 }
 /* END calendar-headers */
 /* Calendar banners - date header, "Today / No Events" box (.events-button),
@@ -168,7 +168,7 @@ StWidget:selected {
 .world-clocks-button,
 .events-button,
 .weather-button {
-    background-color: #33333c !important;
+    background-color: #2c2c36 !important;
 }
 
 /* Brighter banner text (date header + world clocks/events/weather), #f0f0f0 */
@@ -955,6 +955,9 @@ StEntry:focus {
 }
 .page-navigation-arrow:active:focus {
     background-color: st-mix(st-mix(#5a3e8b, #ffffff, 60%), st-lighten(#222226, 9%), 5%);
+}
+.workspace-thumbnails .workspace-thumbnail {
+    background-color: #282a36;
 }
 .workspace-thumbnail-indicator {
     border: 3px solid #5a3e8b;

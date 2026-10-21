@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <style-scheme id="catppuccin-frappe-titlebar" version="1.0" name="Catppuccin Frappé (Titlebar BG)" kind="dark">
-  <description>Soothing pastel theme for Gedit</description>
+  <description>Soothing pastel theme</description>
 
   <!-- Catppuccin Palette -->
   <color name="frappe_rosewater" value="#f2d5cf"/>

@@ -32,7 +32,6 @@ INCLUDE_PATHS=(
   ".config/qwhitesurgtkdecorations.conf"
   ".local/share/color-schemes"
   ".local/share/fonts"
-  ".local/share/libgedit-gtksourceview-300/styles"
   ".themes/Adwaita-custom"
   ".themes/qt-plugins/qt6/wayland-decoration-client"
 )

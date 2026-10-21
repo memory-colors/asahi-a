@@ -1,6 +1,7 @@
 [Added Associations]
 video/mp4=smplayer.desktop;
 application/x-desktop=org.gnome.TextEditor.desktop;
+application/xml=org.gnome.TextEditor.desktop;
 
 [Default Applications]
 application/vnd.debian.binary-package=gdebi.desktop

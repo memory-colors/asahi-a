@@ -314,16 +314,15 @@ EXCLUDES=(
     "var/swap/*"
     "LiveOS" "LiveOS/*"
     "mnt/*" "media/*"
-    "var/cache/*" "var/log/journal/*"
+    "var/cache/*" "var/log/journal/*" "var/lib/systemd/coredump/*"
     "lost+found"
     "root/atomic-image-staging/*"
 )
 for homedir in /home/*/; do
     user="$(basename "$homedir")"
     # Claude Code (.claude config/session + .local/share/claude + .local/bin/claude) is
-    # TEMPORARILY kept in the image (not excluded) for on-B audio diagnosis - see handoff
-    # note on /persist. Revert by re-adding those three paths here once diagnosis is done -
-    # standing policy is no Claude Code on B (asahi_atomic memory).
+    # kept in the image on purpose (policy since 2026-10-11: useful for live diagnosis on B).
+    # Do not re-add those paths here.
     EXCLUDES+=("home/${user}/.cache/*" "home/${user}/Software/asahi_atomic/*.log" "home/${user}/Software/asahi_atomic/backups/*")
     # Brave stores its own regenerable browser cache under ~/.config instead of
     # respecting ~/.cache - found via a real ~184MB hit in a squash build (2026-09-21).
@@ -496,6 +495,10 @@ done
 # instead of replacing it - fatal if a prior run left a complete-but-unverified
 # squashfs.img in STAGING (e.g. aborted later in Step 3). Force a clean start.
 rm -f "$SQUASH_IMG"
+
+# mksquashfs -wildcards uses fnmatch with FNM_PERIOD: "dir/*" does NOT match dot-entries, so hidden items under an excluded dir (e.g. /persist/.index, 6 GB of
+# videos, found 2026-10-19 when the image came out 8.1G instead of ~3.5G) were squashed anyway. Add the dotted twin of every "dir/*" exclusion.
+for _p in "${EXCLUDES[@]}"; do case "$_p" in */\*) EXCLUDES+=("${_p%\*}.*") ;; esac; done
 
 mksquashfs / "$SQUASH_IMG" \
     -noappend \
@@ -728,7 +731,8 @@ umount "$TMPROOT"
 # the DTB from its original asahi-installer provisioning - audio-specific case of
 # the firmware/kernel co-versioning risk in gotcha #19; fixed manually once
 # 2026-10-11, now done automatically here on every rebuild).
-ESP_PART="$(lsblk -rno PATH,PARTLABEL | awk '$2=="atomic-esp"{print $1; exit}')"
+# atomic-esp is the vfat FILESYSTEM label (the GPT PARTLABEL is empty on this machine), so look it up by label first, PARTLABEL as a fallback
+ESP_PART="$(blkid -L atomic-esp 2>/dev/null || lsblk -rno PATH,PARTLABEL | awk '$2=="atomic-esp"{print $1; exit}')"
 if [ -n "$ESP_PART" ]; then
     echo "Refreshing B's ESP firmware (update-m1n1) on $ESP_PART..."
     TMPESP="$(mktemp -d)"
@@ -737,7 +741,7 @@ if [ -n "$ESP_PART" ]; then
     umount "$TMPESP"
     rmdir "$TMPESP"
 else
-    echo "WARNING: could not find B's ESP (PARTLABEL atomic-esp) - skipping m1n1 firmware refresh. Audio (and possibly other devicetree-dependent hardware) may be stale on B after this rebuild if A's kernel has changed since B's ESP was last refreshed." >&2
+    echo "WARNING: could not find B's ESP (label atomic-esp) - skipping m1n1 firmware refresh. Audio (and possibly other devicetree-dependent hardware) may be stale on B after this rebuild if A's kernel has changed since B's ESP was last refreshed." >&2
 fi
 
 # Remember which partitions this run targeted (by PARTUUID, so it still

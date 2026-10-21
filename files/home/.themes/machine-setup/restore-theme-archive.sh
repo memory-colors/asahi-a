@@ -66,12 +66,6 @@ fi
 echo "== Refreshing font cache =="
 fc-cache -f "$HOME/.local/share/fonts" >/dev/null 2>&1 || true
 
-echo "== Setting gedit dark style scheme =="
-if [ -f "$STAGE/home/.local/share/libgedit-gtksourceview-300/styles/onedark-titlebar.xml" ]; then
-    dconf write /org/gnome/gedit/preferences/editor/style-scheme-for-dark-theme-variant "'onedark-titlebar'"
-    echo "  Set onedark-titlebar as dark style scheme"
-fi
-
 cat <<'EOF'
 
 == Manual steps still needed (package install/removal is distro-specific, not automated here) ==

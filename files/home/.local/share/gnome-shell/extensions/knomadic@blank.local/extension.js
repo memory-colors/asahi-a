@@ -914,15 +914,11 @@ export default class RoundedWindowCornersExtension extends Extension {
     }
 
     // ── Shell theme loader (merged from the stock User Themes extension, see theme/). Started first so the theme loads even if
-    //    something later in enable() fails. Skipped while the stock extension is still enabled. ──
+    //    something later in enable() fails. ──
     #theme = null;
 
     #startTheme() {
         try {
-            if (!ThemeManager.canStart()) {
-                console.warn('Knomadic theme loader: stock User Themes is still enabled - not starting (disable it first)');
-                return;
-            }
             this.#theme = new ThemeManager(_settings);
             this.#theme.enable();
         } catch (e) {
@@ -940,15 +936,11 @@ export default class RoundedWindowCornersExtension extends Extension {
         this.#theme = null;
     }
 
-    // ── Window Gap (merged from window-gap@blank.local, see gap/). Skipped while the standalone extension is still enabled ──
+    // ── Window Gap (see gap/) ──
     #gap = null;
 
     #startGap() {
         try {
-            if (!WindowGap.canStart()) {
-                console.warn('Knomadic Window Gap: window-gap@blank.local is still enabled - not starting (disable it first)');
-                return;
-            }
             this.#gap = new WindowGap(_settings);
             this.#gap.enable();
         } catch (e) {
@@ -989,7 +981,7 @@ export default class RoundedWindowCornersExtension extends Extension {
         this.#popupDismiss = null;
     }
 
-    // ── Top Bar (merged from Dash to Panel, see topbar/). Off until 'topbar-enabled' is set AND Dash to Panel is disabled ──
+    // ── Top Bar (see topbar/). Off until 'topbar-enabled' is set ──
     #topBar = null;
     #topBarSettingId = 0;
 
@@ -1003,10 +995,6 @@ export default class RoundedWindowCornersExtension extends Extension {
             }
             if (!_settings.get_boolean('topbar-enabled'))
                 return;
-            if (!TopBar.canStart()) {
-                console.warn('Knomadic Top Bar: Dash to Panel is still enabled - not starting (disable it first)');
-                return;
-            }
             this.#topBar = new TopBar(_settings);
             this.#topBar.enable();
         } catch (e) {
@@ -1064,7 +1052,7 @@ export default class RoundedWindowCornersExtension extends Extension {
     #startOverviewTweaks() {
         try {
             this.#hideTopBarInOverview();
-            logDbg(`OVERVIEW top-bar fade hooked (own topBar=${!!this.#topBar}, d2p panels=${global.dashToPanel?.panels?.length ?? 'none'})`);
+            logDbg(`OVERVIEW top-bar fade hooked (own topBar=${!!this.#topBar})`);
         } catch (e) {
             logDbg(`top-bar tweak failed: ${e}`);
         }
@@ -1231,13 +1219,12 @@ export default class RoundedWindowCornersExtension extends Extension {
         }
     }
 
-    // Top bar (dash-to-panel's panel boxes) fades out while the Overview is open. Opacity is used on purpose:
-    // dash-to-panel's own overview handler show()s/hide()s the box and intellihide drives its translation,
-    // but neither touches opacity, so the three don't fight.
+    // Knomadic's top bar fades out while the Overview is open. Opacity is used on purpose: intellihide drives
+    // the box's translation but never touches opacity, so the two don't fight.
     #hideTopBarInOverview() {
         const boxes = () => this.#topBar
             ? [Main.layoutManager.panelBox]
-            : (global.dashToPanel?.panels ?? []).map(p => p.panelBox).filter(Boolean);
+            : [];
         const fade = (opacity, reactive) => boxes().forEach(b => {
             logDbg(`OVERVIEW top-bar fade to ${opacity} on ${b}`);
             b.remove_transition('opacity');

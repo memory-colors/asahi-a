@@ -13,7 +13,6 @@ import { GapManager } from './gapManager.js';
 
 const PREFIX = 'windowgap-';
 const FORCE_COOLDOWN_MS = 350;   // see rebuild() below: forced requests this soon after a rebuild are our own reflow echoing back: ignore them
-const OLD_UUID = 'window-gap@blank.local';
 
 // GapManager asks for 'uniform', 'gap-size', 'margin-top', ... ; map them to Knomadic's prefixed keys.
 class GapSettings {
@@ -28,11 +27,6 @@ class GapSettings {
 export class WindowGap {
     constructor(settings) {
         this._settings = settings;
-    }
-
-    // Don't double the gap: skip when the standalone extension is still enabled.
-    static canStart() {
-        return !global.settings.get_strv('enabled-extensions').includes(OLD_UUID);
     }
 
     enable() {

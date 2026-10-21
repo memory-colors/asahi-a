@@ -9122,8 +9122,7 @@ themeswitcher checkbutton.dark {
    Editor specifically did NOT show any change, meaning it overrides this
    with its own higher-priority CSS for its titlebar widget. Reverted rather
    than leave collateral effect on other apps (Tweaks) for no gain on the
-   actual target. See gedit-titlebar-mystery-2026-09-26.md for the earlier,
-   similarly-unresolved analogous case. */
+   actual target. */
 
 /* KNOMADIC: gtk-titlebar BEGIN - do not edit by hand, see set-gtk-titlebar-color.sh */
 window headerbar:not(.default-decoration),

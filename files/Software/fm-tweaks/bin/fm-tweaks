@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
 """
-fm-tweaks - one config, one generator for the personal file-manager / Qt look: Dolphin (opt-in), Thunar, SMPlayer, Konsole/Ark/kcolorchooser.
+fm-tweaks - one config, one generator for the personal file-manager / Qt look: Thunar, SMPlayer, Konsole/Ark/kcolorchooser.
 
   conf      ~/.config/fm-tweaks/fm-tweaks.conf   (the ONLY file you edit; `init` writes it from the defaults below)
   templates <repo>/templates/*.in                           ({{token}} placeholders; human-readable, hand-edited)
-  outputs   (GENERATED, never hand-edited; changed files only are rewritten)
-              <out>/dolphin-theme.qss    shared.qss + dolphin.qss   -> loaded by the launcher with -stylesheet
-              <out>/shared.qss           menus / tooltips only      -> may also be loaded globally (e.g. qt6ct stylesheets=)
-              <out>/breeze-colors.conf   runtime values read by the patched Breeze (pathbar=) and by the shim (text=, urltext=, arrowgap=, inactivetext=, edgeradius=)
-              ~/.local/share/color-schemes/dolphin-tweaks.colors    and dolphinrc [UiSettings] ColorScheme=fm-tweaks
-  <out> = $FM_TWEAKS_OUT or ~/.themes/dolphin-theme (the patched Breeze reads that path).
-  Also generated (2026-10-17 reorganisation; qt6ct is retired): the Thunar css (~/.themes/fm-sample), the general Qt look for the wrapped apps (~/.themes/qt-fm/{qt-general,kcolorchooser}.qss,
-  ~/.config/fm-tweaks/qt-theme.conf, bluegrey.colors + the [Colors:*] blocks of kdeglobals) and SMPlayer's own palette (qt-theme-smplayer.conf + style.qss from the sm* keys). The Dolphin outputs above
-  are written only with FM_TWEAKS_DOLPHIN=1. See README.md.
+  outputs   (GENERATED, never hand-edited; changed files only are rewritten): the Thunar css (~/.themes/fm-sample), the general Qt look for the wrapped
+            apps (~/.themes/qt-fm/{qt-general,kcolorchooser}.qss, ~/.config/fm-tweaks/qt-theme.conf, bluegrey.colors + the [Colors:*] blocks of kdeglobals)
+            and SMPlayer's own palette (qt-theme-smplayer.conf + style.qss from the sm* keys). See README.md.
 
 Commands:
   apply [--dry-run] [--quiet]   write the outputs from the conf (idempotent)
@@ -20,9 +14,9 @@ Commands:
   list                          every key: current value, default, meaning
   get <key>                     effective value (override keys fall back to what they follow)
   set <key> <value>             change a key in the conf, then apply   (`set <override> ""` clears an override)
-  color <key> <hex|--get>       same as get/set for color keys; setting `view` also clears the pathbar/statusbar overrides (Knomadic rows use this)
+  color <key> <hex|--get>       same as get/set for color keys; setting `view` also clears the statusbar override (Knomadic rows use this)
   init                          write the conf from the defaults (refuses to overwrite)
-Restart Dolphin to see changes (the launcher applies at start).
+Restart Thunar / the Qt app to see changes.
 """
 import os, re, sys
 
@@ -31,8 +25,6 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 ROOT = os.path.dirname(HERE)
 TEMPLATES = os.path.join(ROOT, 'templates')
 CONF = os.environ.get('FM_TWEAKS_CONF') or os.path.join(HOME, '.config/fm-tweaks/fm-tweaks.conf')
-OUT = os.environ.get('FM_TWEAKS_OUT') or os.path.join(HOME, '.themes/dolphin-theme')
-SCHEME = os.path.join(os.environ.get('FM_TWEAKS_SCHEMES') or os.path.join(HOME, '.local/share/color-schemes'), 'dolphin-tweaks.colors')
 QT_QSS = os.environ.get('FM_TWEAKS_QT_QSS') or os.path.join(HOME, '.themes/qt-fm/qt-general.qss')   # rounded menus/tooltips for every wrapped Qt app (~/.local/bin/konsole, ark: -stylesheet)
 KCOLOR_QSS = os.environ.get('FM_TWEAKS_KCOLOR_QSS') or os.path.join(HOME, '.themes/qt-fm/kcolorchooser.qss')   # qt-general.qss + frameless colour swatches; Knomadic passes it to kcolorchooser
 KDE_SCHEME = os.environ.get('FM_TWEAKS_KDE_SCHEME') or os.path.join(HOME, '.local/share/color-schemes/bluegrey.colors')   # KColorScheme Konsole reads (toolbar, menu text)
@@ -44,27 +36,23 @@ QT_THEME_SM = os.environ.get('FM_TWEAKS_QT_THEME_SM') or os.path.join(HOME, '.co
 QT_FONT, QT_ICON_THEME = 'SF Pro Regular,14', 'MacTahoe-nord-dark'  # 14 = what qt6ct used for the wrapped Qt apps
 SMPLAYER_MENU_RADIUS = (16, 8)   # menu, highlighted item (px): SMPlayer runs scaled 0.8 (hdpi.ini), so a bit bigger than the shared 10/5
 THUNAR_OUT = os.environ.get('FM_TWEAKS_THUNAR_OUT') or os.path.join(HOME, '.themes/fm-sample')   # the Thunar/GTK3 trial theme (thunar-fm)
-DOLPHINRC = os.environ.get('FM_TWEAKS_DOLPHINRC') or os.path.join(HOME, '.config/dolphinrc')
 
 # ---------------------------------------------------------------- the key table: the single place that knows every setting
 # (section, key, default, kind, meaning). kind: color | color? (optional override, empty = follow) | float
 KEYS = [
     ('colors', 'sidebar',     '383840', 'color',  'Places panel background'),
-    ('colors', 'view',        '1c1c20', 'color',  'main file view background; also derives status bar, path bar, column-header row, zoom-slider track + handle'),
-    ('colors', 'accent',      '5a3e8b', 'color',  'selection fill, hover tint, focus ring, zoom-slider fill, context-menu highlight, disk bars'),
-    ('colors', 'window',      '2c2c31', 'color',  'Folders tree, Information panel, toolbar / menu bar'),
+    ('colors', 'view',        '1c1c20', 'color',  'main file view background; also toolbar/location bar, status bar, column-header row'),
+    ('colors', 'accent',      '5a3e8b', 'color',  'selection fill, hover tint, focus ring, context-menu highlight'),
+    ('colors', 'window',      '2c2c31', 'color',  'menus (Thunar), Qt window background'),
     ('colors', 'tooltip',     '383840', 'color',  'tooltips, context menus, Open With dialog (shared.qss)'),
-    ('overrides', 'pathbar',  '',       'color?', 'path/breadcrumb bar background (empty = follow view)'),
     ('overrides', 'statusbar', '',      'color?', 'status bar background (empty = follow view)'),
-    ('overrides', 'button',   '',       'color?', 'column-header (Name/Size) bar, push buttons + the Qt button swatch (empty = view shifted by D_BUTTON; Dolphin derives its header row the same way); the Thunar titlebar has its own key `titlebar`'),
+    ('overrides', 'button',   '',       'color?', 'column-header (Name/Size) bar, push buttons + the Qt button swatch (empty = view shifted by D_BUTTON); the Thunar titlebar has its own key `titlebar`'),
     ('overrides', 'titlebar', '',      'color?', 'Thunar titlebar (empty = follow button)'),
     ('overrides', 'sidebarhl', '',      'color?', 'selected row in the Places sidebar - Thunar only (empty = follow accent)'),
-    ('text', 'text',          'deddda', 'color',  'general Dolphin text: file names + details, Folders tree, Information panel (Dolphin process only)'),
+    ('text', 'text',          'deddda', 'color',  'general text: file names + details, Qt app text'),
     ('text', 'sidebartext',   'dcdcdc', 'color',  'Places panel text'),
     ('text', 'buttontext',    'dcdcdc', 'color',  'column-header row + menu item text'),
-    ('text', 'urltext',       'dcdcdc', 'color',  'path/breadcrumb bar text'),
     ('text', 'statustext',    'dcdcdc', 'color',  'status bar labels (message, item count, zoom, progress)'),
-    ('text', 'disktext',      'dcdcdc', 'color',  'disk-usage text ("x GiB free")'),
     ('text', 'hltext',        'ffffff', 'color',  'text on highlighted (selected / hovered menu) rows - Thunar only'),
     ('smplayer', 'menubar_hidden', 'true', 'bool', 'SMPlayer: hide the menu bar until the toggle key is pressed'),
     ('smplayer', 'menubar_key', 'Ctrl+M', 'text', 'SMPlayer: key that shows/hides the menu bar (free it in SMPlayer first; empty = none)'),
@@ -81,17 +69,13 @@ KEYS = [
     ('smplayer', 'smtext',    '', 'color?', 'SMPlayer text, incl. buttons and menu items (empty = follow text)'),
     ('smplayer', 'smstatustext', '', 'color?', 'SMPlayer status bar text (empty = follow statustext)'),
     ('smplayer', 'smhltext',  '', 'color?', 'SMPlayer text on highlighted rows (empty = follow hltext)'),
-    ('shim', 'arrowgap',      '4',      'float',  'px the folder icon + name are pulled toward the expander arrow'),
-    ('shim', 'edgeradius',   '0',      'float',  'rounded corners (px) on the end of a row highlight that is cut off by the view edge in a narrow pane / split view; 0 = stock; Breeze\'s own corner is ~5'),
-    ('shim', 'inactivetext',  '0.53',   'float',  'share of text/icon strength kept in the inactive split pane (lower = dimmer)'),
+    ('thunar', 'inactivetext', '0.53',  'float',  'Thunar: opacity of the inactive split pane (lower = dimmer)'),
 ]
 BYKEY = {k[1]: k for k in KEYS}
 HEX = re.compile(r'^#?([0-9a-fA-F]{6})$')
 
 # Fixed look relationships (one set for every machine; per-machine differences come from the base colors in the conf)
 D_BUTTON = (-6, -6, -8)     # column-header row = view + this
-D_TRACK = (-1, -1, -3)      # zoom slider groove
-D_HANDLE = (-6, -6, -8)     # zoom slider handle
 D_TIPBORDER = (18, 18, 18)  # tooltip border = tooltip + this
 D_DIVIDER = (7, 7, 8)       # Thunar pane dividers = view + this
 D_ACCENT_HOVER = (18, 8, 21)  # Thunar default-dialog-button hover = accent + this
@@ -136,7 +120,6 @@ SM_FOLLOW = {'smmenu': 'tooltip', 'smpanel': 'window', 'smcontent': 'view', 'smf
 
 def effective(v):
     e = dict(v)
-    e['pathbar'] = v['pathbar'] or v['view']
     e['statusbar'] = v['statusbar'] or v['view']
     e['button'] = v['button'] or shift(v['view'], D_BUTTON)
     e['sidebarhl'] = v['sidebarhl'] or v['accent']
@@ -165,8 +148,8 @@ def write_conf_keys(changes):
     atomic_write(CONF, text)
 
 def conf_text():
-    out = ['# fm-tweaks.conf - the single source of truth for the Dolphin look. Edit here, or: fm-tweaks set <key> <value>.',
-           '# `fm-tweaks apply` regenerates the QSS, color scheme and runtime file; the launcher does it at every start. Restart Dolphin to see changes.', '']
+    out = ['# fm-tweaks.conf - the single source of truth for the Thunar / SMPlayer / Qt app look. Edit here, or: fm-tweaks set <key> <value>.',
+           '# `fm-tweaks apply` regenerates every output (Knomadic rows do it via fm-color.sh). Restart Thunar / the app to see changes.', '']
     sec = None
     for s, k, d, kind, doc in KEYS:
         if s != sec:
@@ -174,7 +157,7 @@ def conf_text():
             sec = s
         val = ('#' + d if d and kind in ('color', 'color?') else d)
         out.append('%-12s = %-8s  # %s' % (k, val, doc))
-        if k in ('disktext', 'statusbar', 'tooltip'):
+        if k in ('statustext', 'statusbar', 'tooltip'):
             out.append('')
     return '\n'.join(out) + '\n'
 
@@ -190,15 +173,13 @@ def atomic_write(path, text):
 
 def tokens(e):
     v = e['view']
-    t = {k: '#' + e[k] for k in ('sidebar', 'view', 'accent', 'window', 'tooltip', 'pathbar', 'statusbar',
-                                 'text', 'sidebartext', 'buttontext', 'urltext', 'statustext', 'disktext', 'button', 'sidebarhl', 'hltext', 'titlebar')}
+    t = {k: '#' + e[k] for k in ('sidebar', 'view', 'accent', 'window', 'tooltip', 'statusbar',
+                                 'text', 'sidebartext', 'buttontext', 'statustext', 'button', 'sidebarhl', 'hltext', 'titlebar')}
     t['inactivetext'] = e['inactivetext']
     # Thunar paints the file-view selection as accent_bg_color at 50% alpha over the view colour: accent_paint = 2*accent - view (clamped), so it lands on the swatch
     t['accent_paint'] = '#' + ''.join('%02x' % max(0, min(255, 2 * int(e['accent'][i:i + 2], 16) - int(e['view'][i:i + 2], 16))) for i in (0, 2, 4))
     t['divider'] = '#' + shift(v, D_DIVIDER)
     t['accent_hover'] = '#' + shift(e['accent'], D_ACCENT_HOVER)
-    t['track'] = '#' + shift(v, D_TRACK)
-    t['handle'] = '#' + shift(v, D_HANDLE)
     t['tipborder'] = '#' + shift(e['tooltip'], D_TIPBORDER)
     for k in ('view', 'window', 'accent', 'text', 'buttontext'):
         t[k + '_dec'] = dec(e[k])
@@ -271,22 +252,6 @@ def render(name, t):
         sys.exit('fm-tweaks: template %s uses unknown token(s): %s' % (name, ', '.join(sorted(missing))))
     return re.sub(r'\{\{(\w+)\}\}', lambda m: t[m.group(1)], text)
 
-def runtime_conf(e):
-    return 'pathbar=#%s\ntext=#%s\narrowgap=%s\ninactivetext=%s\nedgeradius=%s\nurltext=#%s\n' % (e['pathbar'], e['text'], e['arrowgap'], e['inactivetext'], e['edgeradius'], e['urltext'])
-
-def dolphinrc_fix(text):
-    """ensure [UiSettings] ColorScheme=fm-tweaks (anchored; creates the section/key when missing)"""
-    sec = re.search(r'(?ms)^\[UiSettings\][ \t]*(?:\n|\Z)(.*?)(?=^\[|\Z)', text)
-    if sec:
-        body = sec.group(1)
-        if re.search(r'(?m)^ColorScheme=', body):
-            nb = re.sub(r'(?m)^ColorScheme=.*$', 'ColorScheme=fm-tweaks', body, count=1)
-        else:
-            nb = 'ColorScheme=fm-tweaks\n' + body
-        head = text[:sec.start(1)]
-        return head + ('' if head.endswith('\n') else '\n') + nb + text[sec.end(1):]
-    return text + ('' if text.endswith('\n') or not text else '\n') + '\n[UiSettings]\nColorScheme=fm-tweaks\n'
-
 def outputs(e):
     v = read_conf()
     t = tokens(e)
@@ -308,16 +273,6 @@ def outputs(e):
     kg = os.path.realpath(KDEGLOBALS)   # ~/.config/kdeglobals is a symlink into ~/.themes: write the target, never replace the link
     if os.path.exists(kg):
         out.append((kg, kdeglobals_text(e, open(kg).read())))
-    if os.environ.get('FM_TWEAKS_DOLPHIN') == '1':   # Dolphin was retired 2026-10-16: its outputs (QSS, color scheme, dolphinrc) are only written on request
-        dol = render('dolphin.qss.in', t)
-        rc = open(DOLPHINRC).read() if os.path.exists(DOLPHINRC) else ''
-        out += [
-            (os.path.join(OUT, 'dolphin-theme.qss'), shared.rstrip('\n') + '\n\n' + dol),
-            (os.path.join(OUT, 'shared.qss'), shared),
-            (os.path.join(OUT, 'breeze-colors.conf'), runtime_conf(e)),
-            (SCHEME, render('dolphin-tweaks.colors.in', t)),
-            (DOLPHINRC, dolphinrc_fix(rc)),
-        ]
     return out
 
 def link_smplayer_icons(dry):
@@ -391,7 +346,7 @@ def main(argv):
         parsed = parse_value(key, val) if val else ''
         changes = {key: parsed}
         if c == 'color' and key == 'view':
-            changes.update({'pathbar': '', 'statusbar': ''})
+            changes.update({'statusbar': ''})
         write_conf_keys(changes)
         cmd_apply(); return 0
     sys.exit(__doc__)

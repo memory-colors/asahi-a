@@ -1,0 +1,526 @@
+--- a/thunar/thunar-util.c
++++ b/thunar/thunar-util.c
+@@ -737,6 +737,51 @@
+ 
+ 
+ 
++/*
++ * thunar_util_split_number_suffix
++ *
++ * Looks for a trailing " (N)" at the end of the first @stem_len bytes of @stem, N being a plain
++ * number of 1-3 digits without leading zeros (or "0"). On success @base_len is the length of the name
++ * in front of the " (N)" and @number is N; otherwise @base_len = @stem_len and @number = 0.
++ * Used so that a name clash with "file (5).ext" resolves to "file (6).ext", not "file (5) (1).ext".
++ */
++gboolean
++thunar_util_split_number_suffix (const gchar *stem,
++                                 gsize        stem_len,
++                                 gsize       *base_len,
++                                 guint       *number)
++{
++  gsize digits;
++  gsize i;
++  guint value = 0;
++
++  *base_len = stem_len;
++  *number = 0;
++
++  if (stem_len < 5 || stem[stem_len - 1] != ')')
++    return FALSE;
++
++  for (digits = 0; digits < 4 && digits + 2 < stem_len && g_ascii_isdigit (stem[stem_len - 2 - digits]); digits++)
++    ;
++  if (digits < 1 || digits > 3)
++    return FALSE;
++
++  i = stem_len - 1 - digits;                /* index of the first digit */
++  if (stem_len < digits + 4 || stem[i - 1] != '(' || stem[i - 2] != ' ')
++    return FALSE;
++  if (digits > 1 && stem[i] == '0')
++    return FALSE;
++
++  for (gsize k = 0; k < digits; k++)
++    value = value * 10 + (guint) (stem[i + k] - '0');
++
++  *base_len = i - 2;
++  *number = value;
++  return TRUE;
++}
++
++
++
+ /**
+  * thunar_util_next_new_file_name_raw
+  * @file_list List of GFiles to check for the name
+@@ -769,6 +814,8 @@
+ {
+   unsigned long file_name_size = strlen (file_name);
+   unsigned      count = 0;
++  gsize         base_size = 0;
++  guint         base_number = 0;
+   gboolean      found_duplicate = FALSE;
+   gchar        *extension = NULL;
+   gchar        *new_name = g_strdup (file_name);
+@@ -781,6 +828,12 @@
+   if (extension != NULL)
+     file_name_size -= strlen (extension);
+ 
++  /* copy mode: "file (5).ext" is numbered on from its own number, "file.ext" starts at 1 */
++  if (name_mode == THUNAR_NEXT_FILE_NAME_MODE_COPY)
++    thunar_util_split_number_suffix (file_name, file_name_size, &base_size, &base_number);
++  else
++    base_size = file_name_size;
++
+   /* loop through the directory until new_name is unique */
+   while (TRUE)
+     {
+@@ -803,7 +856,7 @@
+       if (name_mode == THUNAR_NEXT_FILE_NAME_MODE_NEW)
+         new_name = g_strdup_printf (_("%.*s %u%s"), (int) file_name_size, file_name, ++count, extension ? extension : "");
+       else if (name_mode == THUNAR_NEXT_FILE_NAME_MODE_COPY)
+-        new_name = g_strdup_printf (_("%.*s (copy %u)%s"), (int) file_name_size, file_name, ++count, extension ? extension : "");
++        new_name = g_strdup_printf ("%.*s (%u)%s", (int) base_size, file_name, base_number + (++count), extension ? extension : "");
+       else if (name_mode == THUNAR_NEXT_FILE_NAME_MODE_LINK)
+         {
+           if (count == 0)
+--- a/thunar/thunar-util.h
++++ b/thunar/thunar-util.h
+@@ -52,6 +52,10 @@
+ 
+ gchar *
+ thunar_util_str_get_extension (const gchar *name) G_GNUC_WARN_UNUSED_RESULT;
++gboolean     thunar_util_split_number_suffix       (const gchar            *stem,
++                                                    gsize                   stem_len,
++                                                    gsize                  *base_len,
++                                                    guint                  *number);
+ 
+ void
+ thunar_util_load_bookmarks (GFile              *bookmarks_file,
+--- a/thunar/thunar-io-jobs-util.c
++++ b/thunar/thunar-io-jobs-util.c
+@@ -29,6 +29,8 @@
+ #include "thunar/thunar-private.h"
+ #include "thunar/thunar-util.h"
+ 
++#include <string.h>
++
+ #include <gio/gio.h>
+ 
+ 
+@@ -138,7 +140,6 @@
+   GFile     *parent_file = NULL;
+   gchar     *old_filename;
+   gchar     *filename;
+-  gchar     *file_basename;
+   gchar     *extension = NULL;
+ 
+   _thunar_return_val_if_fail (THUNAR_IS_JOB (job), NULL);
+@@ -170,18 +171,16 @@
+   if (g_file_info_get_file_type (info) != G_FILE_TYPE_DIRECTORY)
+     extension = thunar_util_str_get_extension (old_filename);
+ 
+-  if (extension != NULL)
+-    {
+-      file_basename = g_strndup (old_filename, extension - old_filename);
+-      /* I18N: put " (copy #)" between basename and extension */
+-      filename = g_strdup_printf (_("%s (copy %u)%s"), file_basename, n, extension);
+-      g_free (file_basename);
+-    }
+-  else
+-    {
+-      /* I18N: put " (copy #)" after filename (for files without extension) */
+-      filename = g_strdup_printf (_("%s (copy %u)"), old_filename, n);
+-    }
++  /* "file (5).ext" goes on from its own number ("file (6).ext", ...), "file.ext" starts at 1; the caller
++   * retries with the next @n whenever the target exists, so no existing file is ever picked */
++  {
++    gsize stem_len = extension != NULL ? (gsize) (extension - old_filename) : strlen (old_filename);
++    gsize base_len;
++    guint base_number;
++
++    thunar_util_split_number_suffix (old_filename, stem_len, &base_len, &base_number);
++    filename = g_strdup_printf ("%.*s (%u)%s", (int) base_len, old_filename, base_number + n, extension != NULL ? extension : "");
++  }
+ 
+   /* create the GFile for the copy/move */
+   parent_file = g_file_get_parent (tgt_file);
+--- a/thunar/thunar-transfer-job.c
++++ b/thunar/thunar-transfer-job.c
+@@ -431,7 +431,9 @@
+           /* allocate a new transfer node for the child */
+           child_node = g_slice_new0 (ThunarTransferNode);
+           child_node->source_file = g_object_ref (lp->data);
+-          child_node->replace_confirmed = node->replace_confirmed;
++          /* an earlier "Replace" answer for a FOLDER means merge into it, never "overwrite everything inside":
++           * every file inside that already exists at the target gets its own question */
++          child_node->replace_confirmed = FALSE;
+           child_node->rename_confirmed = FALSE;
+ 
+           /* hook the child node into the child list */
+@@ -820,6 +822,7 @@
+                                GList             **target_file_list_return,
+                                GError            **error)
+ {
++  gboolean              toplevel;
+   static const GRegex  *windows_reserved_name = NULL;
+   ThunarThumbnailCache *thumbnail_cache;
+   ThunarApplication    *application;
+@@ -888,6 +891,8 @@
+       use_fat_name_scheme = FALSE;
+     }
+ 
++  toplevel = (target_file != NULL);
++
+   for (; err == NULL && node != NULL; node = node->next)
+     {
+       /* query file info */
+@@ -960,6 +965,54 @@
+       /* update progress information */
+       exo_job_info_message (EXO_JOB (job), "%s", g_file_info_get_display_name (info));
+ 
++      /* a folder dropped onto an existing folder of the same name: ask once (Merge / Rename / Cancel) for the folder the user
++       * moved or copied. Folders of the same name further down simply merge; only files that clash get asked about later. */
++      if (toplevel && !node->replace_confirmed && !node->rename_confirmed
++          && g_file_query_file_type (node->source_file, G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, NULL) == G_FILE_TYPE_DIRECTORY
++          && g_file_query_file_type (target_file, G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, NULL) == G_FILE_TYPE_DIRECTORY
++          && !g_file_equal (node->source_file, target_file))
++        {
++          response = thunar_job_ask_replace (THUNAR_JOB (job), node->source_file, target_file, &err);
++
++          if (err != NULL || response == THUNAR_JOB_RESPONSE_CANCEL || exo_job_is_cancelled (EXO_JOB (job)))
++            {
++              if (err == NULL)
++                exo_job_set_error_if_cancelled (EXO_JOB (job), &err);
++              g_clear_object (&target_file);
++              g_object_unref (info);
++              break;
++            }
++          else if (response == THUNAR_JOB_RESPONSE_RENAME)
++            {
++              GFile *renamed = NULL;
++              gint   n_try = 0;
++
++              while (renamed == NULL || g_file_query_file_type (renamed, G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, NULL) != G_FILE_TYPE_UNKNOWN)
++                {
++                  g_clear_object (&renamed);
++                  renamed = thunar_io_jobs_util_next_renamed_file (THUNAR_JOB (job), node->source_file, target_file, ++n_try, &err);
++                  if (renamed == NULL)
++                    break;
++                }
++              if (renamed == NULL)
++                {
++                  g_clear_object (&target_file);
++                  g_object_unref (info);
++                  break;
++                }
++              g_object_unref (target_file);
++              target_file = renamed;
++              node->rename_confirmed = TRUE;
++            }
++          else if (response == THUNAR_JOB_RESPONSE_SKIP)
++            {
++              g_clear_object (&target_file);
++              g_object_unref (info);
++              continue;
++            }
++          /* THUNAR_JOB_RESPONSE_REPLACE = Merge: carry on, the files inside are asked about one by one */
++        }
++
+ retry_copy:
+       thunar_transfer_job_check_pause (job);
+ 
+@@ -1022,6 +1075,11 @@
+                       thunar_thumbnail_cache_delete_file (thumbnail_cache,
+                                                           node->source_file);
+                     }
++                  else if (g_error_matches (err, G_IO_ERROR, G_IO_ERROR_NOT_EMPTY))
++                    {
++                      /* files inside were skipped (or not moved on purpose): the folder simply stays where it was, no error */
++                      g_clear_error (&err);
++                    }
+                   else
+                     {
+                       /* ask the user to retry */
+@@ -1749,7 +1807,12 @@
+     {
+       g_propagate_error (error, err);
+       if (operation != NULL)
+-        g_object_unref (operation);
++        {
++          /* a cancelled / failed job still undoes what it already moved or copied */
++          if (thunar_job_operation_has_entries (operation))
++            thunar_job_operation_history_commit (operation);
++          g_object_unref (operation);
++        }
+       return FALSE;
+     }
+   else
+--- a/thunar/thunar-dialogs.c
++++ b/thunar/thunar-dialogs.c
+@@ -789,6 +789,8 @@
+   gint               row = 0;
+   gint               scale_factor;
+   gint               width;
++  gboolean           folder_merge;
++  gboolean           mismatch;
+ 
+   _thunar_return_val_if_fail (parent == NULL || GTK_IS_WINDOW (parent), THUNAR_JOB_RESPONSE_CANCEL);
+   _thunar_return_val_if_fail (THUNAR_IS_FILE (src_file), THUNAR_JOB_RESPONSE_CANCEL);
+@@ -802,15 +804,25 @@
+   g_object_unref (G_OBJECT (preferences));
+ 
+   /* setup the confirmation dialog */
+-  dialog = gtk_dialog_new_with_buttons (_("Confirm to replace files"),
++  /* three variants: folder onto folder (Merge / Rename / Cancel), a file or link onto a file (Skip / Rename / Overwrite),
++   * and mismatches (file vs folder, links): never an overwrite or merge, those would destroy a folder */
++  folder_merge = thunar_file_is_directory (dst_file) && !thunar_file_is_symlink (dst_file) && thunar_file_is_directory (src_file) && !thunar_file_is_symlink (src_file);
++  mismatch = !folder_merge && (thunar_file_is_directory (dst_file) || thunar_file_is_directory (src_file) || thunar_file_is_symlink (dst_file) || thunar_file_is_symlink (src_file));
++
++  dialog = gtk_dialog_new_with_buttons (folder_merge ? _("Folder already exists") : _("File already exists"),
+                                         parent,
+                                         GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+-                                          _("_Cancel"), THUNAR_JOB_RESPONSE_CANCEL,
+-                                            _("_Skip"), THUNAR_JOB_RESPONSE_SKIP,
+-                                              _("Re_name"), THUNAR_JOB_RESPONSE_RENAME,
+-                                                _("_Replace"), THUNAR_JOB_RESPONSE_REPLACE,
+-                                        NULL);
+-  gtk_dialog_set_default_response (GTK_DIALOG (dialog), THUNAR_JOB_RESPONSE_REPLACE);
++                                        NULL, NULL);
++  gtk_dialog_add_button (GTK_DIALOG (dialog), _("_Cancel"), THUNAR_JOB_RESPONSE_CANCEL);
++  if (!folder_merge)
++    gtk_dialog_add_button (GTK_DIALOG (dialog), _("_Skip"), THUNAR_JOB_RESPONSE_SKIP);
++  gtk_dialog_add_button (GTK_DIALOG (dialog), _("Re_name"), THUNAR_JOB_RESPONSE_RENAME);
++  if (folder_merge)
++    gtk_dialog_add_button (GTK_DIALOG (dialog), _("_Merge"), THUNAR_JOB_RESPONSE_REPLACE);
++  else if (!mismatch)
++    gtk_dialog_add_button (GTK_DIALOG (dialog), _("_Overwrite"), THUNAR_JOB_RESPONSE_REPLACE);
++  /* Enter must never overwrite or merge anything: the safe answer is the default */
++  gtk_dialog_set_default_response (GTK_DIALOG (dialog), folder_merge ? THUNAR_JOB_RESPONSE_CANCEL : THUNAR_JOB_RESPONSE_SKIP);
+ 
+   content_area = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
+ 
+@@ -847,26 +859,10 @@
+   gtk_grid_attach (GTK_GRID (grid), image, 0, row, 1, 1);
+   gtk_widget_show (image);
+ 
+-  if (thunar_file_is_symlink (dst_file))
+-    {
+-      text = g_strdup_printf (_("This folder already contains a symbolic link \"%s\"."),
+-                              thunar_file_get_display_name (dst_file));
+-    }
+-  else if (thunar_file_is_directory (dst_file))
+-    {
+-      text = g_strdup_printf (_("This folder already contains a folder \"%s\"."),
+-                              thunar_file_get_display_name (dst_file));
+-    }
+-  else
+-    {
+-      if (g_strcmp0 (thunar_file_get_display_name (dst_file), thunar_file_get_basename (dst_file)) != 0)
+-        text = g_strdup_printf (_("This folder already contains a file \"%s\" (%s)."),
+-                                thunar_file_get_display_name (dst_file),
+-                                thunar_file_get_basename (dst_file));
+-      else
+-        text = g_strdup_printf (_("This folder already contains a file \"%s\"."),
+-                                thunar_file_get_display_name (dst_file));
+-    }
++  parent_file = thunar_file_get_parent (dst_file, NULL);
++  if (parent_file != NULL)
++    parent_string = thunar_file_get_basename (parent_file);
++  text = g_strdup_printf (_("\"%s\" already exists in \"%s\"."), thunar_file_get_display_name (dst_file), parent_string);
+ 
+   label = gtk_label_new (text);
+   gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
+@@ -880,19 +876,33 @@
+   gtk_widget_show (label);
+   g_free (text);
+ 
+-  parent_file = thunar_file_get_parent (dst_file, NULL);
+-  if (parent_file != NULL)
+-    parent_string = thunar_file_get_basename (parent_file);
+-
+-  if (thunar_file_is_symlink (dst_file))
+-    /* TRANSLATORS: First part of replace dialog sentence */
+-    text = g_strdup_printf (_("Replace the link in \"%s\""), parent_string);
+-  else if (thunar_file_is_directory (dst_file))
+-    /* TRANSLATORS: First part of replace dialog sentence */
+-    text = g_strdup_printf (_("Replace the existing folder in \"%s\""), parent_string);
++  /* the comparison sentence: size and modified time of the incoming item against the existing one (time within 2 s = equal: FAT / exFAT keep 2 s resolution) */
++  if (folder_merge)
++    text = g_strdup (_("Merging combines both folders. Files that exist in both will be asked about next."));
++  else if (mismatch)
++    text = g_strdup (_("A file and a folder (or a link) cannot be merged or overwritten. Rename or skip the incoming item."));
+   else
+-    /* TRANSLATORS: First part of replace dialog sentence */
+-    text = g_strdup_printf (_("Replace the existing file in \"%s\""), parent_string);
++    {
++      guint64 ssz = thunar_file_get_size (src_file), dsz = thunar_file_get_size (dst_file);
++      gint64  smt = (gint64) thunar_file_get_date (src_file, THUNAR_FILE_DATE_MODIFIED), dmt = (gint64) thunar_file_get_date (dst_file, THUNAR_FILE_DATE_MODIFIED);
++      gchar  *ssz_s = thunar_file_get_size_string_long (src_file, file_size_binary), *dsz_s = thunar_file_get_size_string_long (dst_file, file_size_binary);
++      gchar  *sdt_s = thunar_file_get_date_string (src_file, THUNAR_FILE_DATE_MODIFIED, date_style, date_custom_style), *ddt_s = thunar_file_get_date_string (dst_file, THUNAR_FILE_DATE_MODIFIED, date_style, date_custom_style);
++      const gchar *name = thunar_file_get_display_name (dst_file);
++      gboolean same_size = (ssz == dsz), same_time = (ABS (smt - dmt) <= 2);
++      gchar *l1 = NULL, *l2 = NULL;
++
++      if (same_size && same_time)
++        text = g_strdup (_("The files appear identical (same size and modified date)."));
++      else
++        {
++          if (!same_size)
++            l1 = g_strdup_printf (ssz > dsz ? _("Incoming \"%s\" (%s) is larger than existing \"%s\" (%s).") : _("Incoming \"%s\" (%s) is smaller than existing \"%s\" (%s)."), name, ssz_s, name, dsz_s);
++          if (!same_time)
++            l2 = g_strdup_printf (smt > dmt ? _("Incoming \"%s\" (%s) is newer than existing \"%s\" (%s).") : _("Incoming \"%s\" (%s) is older than existing \"%s\" (%s)."), name, sdt_s, name, ddt_s);
++          text = g_strdup_printf ("%s%s%s", l1 != NULL ? l1 : "", (l1 != NULL && l2 != NULL) ? "\n" : "", l2 != NULL ? l2 : "");
++        }
++      g_free (l1); g_free (l2); g_free (ssz_s); g_free (dsz_s); g_free (sdt_s); g_free (ddt_s);
++    }
+ 
+   if (parent_file != NULL)
+     g_object_unref (parent_file);
+@@ -911,6 +921,15 @@
+   /* next row */
+   row++;
+ 
++  label = gtk_label_new (folder_merge ? _("Existing folder:") : (thunar_file_is_directory (dst_file) ? _("Existing folder:") : _("Existing file:")));
++  gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
++  gtk_widget_set_hexpand (label, TRUE);
++  gtk_grid_attach (GTK_GRID (grid), label, 1, row, 2, 1);
++  gtk_widget_show (label);
++
++  /* next row */
++  row++;
++
+   icon = thunar_icon_factory_load_file_icon (icon_factory, dst_file, THUNAR_FILE_ICON_STATE_DEFAULT, 48, scale_factor, FALSE, NULL);
+   surface = gdk_cairo_surface_create_from_pixbuf (icon, scale_factor, NULL);
+   dst_image = gtk_image_new_from_surface (surface);
+@@ -940,13 +959,13 @@
+ 
+   if (thunar_file_is_symlink (src_file))
+     /* TRANSLATORS: Second part of replace dialog sentence */
+-    text = g_strdup_printf (_("with the following link?"));
++    text = g_strdup_printf (_("Incoming link:"));
+   else if (thunar_file_is_directory (src_file))
+     /* TRANSLATORS: Second part of replace dialog sentence */
+-    text = g_strdup_printf (_("with the following folder?"));
++    text = g_strdup_printf (_("Incoming folder:"));
+   else
+     /* TRANSLATORS: Second part of replace dialog sentence */
+-    text = g_strdup_printf (_("with the following file?"));
++    text = g_strdup_printf (_("Incoming file:"));
+ 
+   /* next row */
+   row++;
+@@ -989,12 +1008,14 @@
+   g_free (text);
+   g_free (date_custom_style);
+ 
++  /* always offered: a single folder can hold thousands of clashing files */
++  multiple_files = TRUE;
+   if (multiple_files)
+     {
+       /* next row */
+       row++;
+ 
+-      check_button = gtk_check_button_new_with_mnemonic (_("_Apply the action to all files and folders"));
++      check_button = gtk_check_button_new_with_mnemonic (_("_Apply to All"));
+       gtk_widget_set_margin_top (check_button, 6);
+       gtk_grid_attach (GTK_GRID (grid), check_button, 0, row, 3, 1);
+       gtk_widget_show (check_button);
+--- a/thunar/thunar-job.c
++++ b/thunar/thunar-job.c
+@@ -70,6 +70,7 @@
+ {
+   ThunarJobResponse      earlier_ask_create_response;
+   ThunarJobResponse      earlier_ask_overwrite_response;
++  ThunarJobResponse      earlier_ask_merge_response;   /* "Apply to All" given on a folder-onto-folder prompt: kept apart from the file answers */
+   ThunarJobResponse      earlier_ask_delete_response;
+   ThunarJobResponse      earlier_ask_skip_response;
+   GList                 *total_files;
+@@ -245,6 +246,7 @@
+   job->priv = thunar_job_get_instance_private (job);
+   job->priv->earlier_ask_create_response = 0;
+   job->priv->earlier_ask_overwrite_response = 0;
++  job->priv->earlier_ask_merge_response = 0;
+   job->priv->earlier_ask_delete_response = 0;
+   job->priv->earlier_ask_skip_response = 0;
+   job->priv->n_total_files = 0;
+@@ -517,6 +519,9 @@
+   ThunarJobResponse response;
+   ThunarFile       *source_file;
+   ThunarFile       *target_file;
++  ThunarJobResponse *earlier;
++  gboolean          folder_clash;
++  gboolean          destructive_ok;
+ 
+   _thunar_return_val_if_fail (THUNAR_IS_JOB (job), THUNAR_JOB_RESPONSE_CANCEL);
+   _thunar_return_val_if_fail (G_IS_FILE (source_path), THUNAR_JOB_RESPONSE_CANCEL);
+@@ -525,16 +530,23 @@
+   if (G_UNLIKELY (exo_job_set_error_if_cancelled (EXO_JOB (job), error)))
+     return THUNAR_JOB_RESPONSE_CANCEL;
+ 
+-  /* check if the user said "Overwrite All" earlier */
+-  if (G_UNLIKELY (job->priv->earlier_ask_overwrite_response == THUNAR_JOB_RESPONSE_REPLACE_ALL))
++  /* folder onto folder (merge) has its own "Apply to All" memory; a file/folder mismatch or a link never inherits "Overwrite All" */
++  {
++    GFileType st = g_file_query_file_type (source_path, G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, NULL);
++    GFileType tt = g_file_query_file_type (target_path, G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, NULL);
++
++    folder_clash = (st == G_FILE_TYPE_DIRECTORY && tt == G_FILE_TYPE_DIRECTORY);
++    destructive_ok = folder_clash || (st != G_FILE_TYPE_DIRECTORY && st != G_FILE_TYPE_SYMBOLIC_LINK && tt != G_FILE_TYPE_DIRECTORY && tt != G_FILE_TYPE_SYMBOLIC_LINK);
++  }
++  earlier = folder_clash ? &job->priv->earlier_ask_merge_response : &job->priv->earlier_ask_overwrite_response;
++
++  if (G_UNLIKELY (*earlier == THUNAR_JOB_RESPONSE_REPLACE_ALL) && destructive_ok)
+     return THUNAR_JOB_RESPONSE_REPLACE;
+ 
+-  /* check if the user said "Rename All" earlier */
+-  if (G_UNLIKELY (job->priv->earlier_ask_overwrite_response == THUNAR_JOB_RESPONSE_RENAME_ALL))
++  if (G_UNLIKELY (*earlier == THUNAR_JOB_RESPONSE_RENAME_ALL))
+     return THUNAR_JOB_RESPONSE_RENAME;
+ 
+-  /* check if the user said "Overwrite None" earlier */
+-  if (G_UNLIKELY (job->priv->earlier_ask_overwrite_response == THUNAR_JOB_RESPONSE_SKIP_ALL))
++  if (G_UNLIKELY (*earlier == THUNAR_JOB_RESPONSE_SKIP_ALL))
+     return THUNAR_JOB_RESPONSE_SKIP;
+ 
+   source_file = thunar_file_get (source_path, error);
+@@ -556,8 +568,9 @@
+   g_object_unref (source_file);
+   g_object_unref (target_file);
+ 
+-  /* remember the response for later */
+-  job->priv->earlier_ask_overwrite_response = response;
++  /* remember "Apply to All" answers for later */
++  if (response == THUNAR_JOB_RESPONSE_REPLACE_ALL || response == THUNAR_JOB_RESPONSE_RENAME_ALL || response == THUNAR_JOB_RESPONSE_SKIP_ALL)
++    *earlier = response;
+ 
+   /* translate the response */
+   if (response == THUNAR_JOB_RESPONSE_REPLACE_ALL)
+--- a/thunar/thunar-job-operation.c
++++ b/thunar/thunar-job-operation.c
+@@ -307,6 +307,15 @@
+ 
+ 
+ 
++/* thunar_job_operation_has_entries: TRUE if anything was recorded (a cancelled job keeps the part it finished, so Ctrl+Z can bring that back) */
++gboolean
++thunar_job_operation_has_entries (ThunarJobOperation *job_operation)
++{
++  return job_operation->source_file_list != NULL || job_operation->target_file_list != NULL;
++}
++
++
++
+ /* thunar_job_operation_new_invert:
+  * @job_operation: a #ThunarJobOperation
+  *
+--- a/thunar/thunar-job-operation.h
++++ b/thunar/thunar-job-operation.h
+@@ -37,6 +37,8 @@
+ void
+ thunar_job_operation_overwrite (ThunarJobOperation *job_operation,
+                                 GFile              *overwritten_file);
++gboolean
++thunar_job_operation_has_entries (ThunarJobOperation *job_operation);
+ ThunarJobOperation *
+ thunar_job_operation_new_invert (ThunarJobOperation *job_operation);
+ gboolean

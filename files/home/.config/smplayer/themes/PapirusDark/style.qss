@@ -1,5 +1,5 @@
-/* SHARED look (templates/shared.qss.in): rounded context menus + tooltips + the Open With dialog. Safe to load globally (e.g. qt6ct stylesheets=)
-   or per app; the Dolphin-only rules live in dolphin.qss.in. GENERATED output - edit the template / dolphin-tweaks.conf, not this file. */
+/* SHARED look (templates/shared.qss.in): rounded context menus + tooltips + the Open With dialog, loaded per wrapped Qt app.
+   GENERATED output - edit the template / fm-tweaks.conf, not this file. */
 QMenu {
     background-color: #2c2c34;
     border: 1px solid #45454d;
@@ -50,7 +50,7 @@ KOpenWithDialog QTreeView {
      content  #161619      playlist body, preferences page list, log/text areas, lists
      field    #121215    table headers, text fields, combos, spin boxes, push buttons, scrollbar + slider grooves   (Knomadic: Button)
      accent   #483676    selection, default button, slider fill, checked tool buttons, focus
-     status   #1c1c20 status bar (SMPlayer paints it black itself; this overrides)   text #828295
+     status   #1c1c20 status bar (SMPlayer paints it black itself; this overrides)   text #4e4e5a
      text     #bdbfd2 / #bdbfd2 (headers, buttons) / #ffffff (on accent)
    Left alone on purpose: the video area (always black), the Information dialog's coloured HTML headings (hard-coded in SMPlayer). */
 /* menu group */
@@ -107,6 +107,6 @@ QCheckBox::indicator:checked { background-color: #483676; image: url(check.svg);
 QRadioButton::indicator:checked { background-color: #483676; image: url(radio.svg); }
 QCheckBox::indicator:disabled, QRadioButton::indicator:disabled { background-color: #2c2c34; }
 /* status group */
-QStatusBar { background-color: #1c1c20; color: #828295; }
-QStatusBar QLabel, QStatusBar QToolButton { color: #828295; background: transparent; }
+QStatusBar { background-color: #1c1c20; color: #4e4e5a; }
+QStatusBar QLabel, QStatusBar QToolButton { color: #4e4e5a; background: transparent; }
 QStatusBar::item { border: none; }

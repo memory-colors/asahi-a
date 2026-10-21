@@ -27,7 +27,7 @@ treeview.view:hover, .sidebar row:hover { background-color: alpha({{accent}}, 0.
 /* detail view: GTK3 paints each COLUMN's cell separately, so a CSS radius would also round the joins between Name | Size | Modified (notches). hooks.so rounds the row's outer ends instead. */
 .standard-view treeview.view:selected, .standard-view treeview.view:hover, .standard-view treeview.view:selected:hover, .standard-view treeview.view:selected:focus, .standard-view treeview.view:selected:backdrop { border-radius: 0; }
 treeview.view header button { background-color: {{window}}; color: {{text}}; border-color: {{window}}; }
-/* menus match Dolphin's: {{window}}, 10px menu, 5px highlight */
+/* menus: {{window}}, 10px menu, 5px highlight */
 menu, .menu, .popup, popover, popover.background { background-color: {{tooltip}}; color: {{text}}; border: 1px solid #45454d; border-radius: 10px; padding: 2px 2px; }
 menuitem { border-radius: 5px; padding: 2px 10px; min-height: 0; }
 menuitem:hover, menuitem:selected { background-color: {{accent}}; color: {{hltext}}; }
@@ -78,7 +78,7 @@ notebook scrolledwindow.frame.standard-view, scrolledwindow.standard-view { bord
 /* bigger expander hit area: wider+taller cell, arrow centered in it (no strip) */
 treeview.view.expander { min-width: 20px; min-height: 20px; padding: 0 1px 0 3px; }
 
-/* toolbar + location bar = view bg; column header row = Dolphin's button color (view - 6,6,8) */
+/* toolbar + location bar = view bg; column header row = button color (view - 6,6,8) */
 toolbar, .thunar toolbar, window.thunar grid > toolbar { background-color: {{view}}; background-image: none; }
 toolbar entry, toolbar .path-bar, toolbar .path-bar button, toolbar entry:focus { background-color: {{view}}; background-image: none; color: {{text}}; border-color: {{window}}; box-shadow: none; }
 treeview.view header button, treeview header button, treeview.view header button:hover { background-color: {{button}}; border-color: {{button}}; color: {{text}}; }

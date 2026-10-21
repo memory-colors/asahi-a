@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""flat-mime-icons - make every size of MacTahoe-nord-dark's file-type icons use the FLAT 22px set (what Dolphin shows at list size), never the
+"""flat-mime-icons - make every size of MacTahoe-nord-dark's file-type icons use the FLAT 22px set (the list-size look), never the
 folded-corner page / QuickTime-tile "scalable" set. Writes a user-owned overlay ~/.local/share/icons/MacTahoe-nord-dark/mimes/scalable (and mimes@2x/scalable)
 of symlinks; GTK and Qt search ~/.local/share/icons BEFORE /usr/share/icons, so no root and the system theme is untouched. Re-run after an icon-theme update.
 Per name: the flat 22px icon of the same name; else of any name along the theme's own symlink chain; else a generic by prefix. Remove: rm -r the overlay mimes dirs.

@@ -1,4 +1,2 @@
-shim/build/
 __pycache__/
 *.tmp-fm-tweaks
-tests/golden*.png

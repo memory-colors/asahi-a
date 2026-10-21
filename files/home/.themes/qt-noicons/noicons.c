@@ -19,7 +19,7 @@ void _ZN16QCoreApplication12setAttributeEN2Qt20ApplicationAttributeEb(int attr, 
     if (real) real(attr, on);
 }
 
-/* Children (shells in Konsole, apps launched from Dolphin) must not inherit the preload. */
+/* Children (shells in Konsole, apps launched from it) must not inherit the preload. */
 __attribute__((constructor)) static void noicons_init(void) {
     void (*real)(int, int) = dlsym(RTLD_NEXT, SETATTR);
     if (real) real(2, 1);

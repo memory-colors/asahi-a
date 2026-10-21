@@ -15,7 +15,7 @@
 # headerbar_bg_color (and its mix()-derived variants) is the libadwaita
 # split-pane sidebar/header color used by apps like Settings/Tweaks - a
 # DIFFERENT visual role from the singular top titlebar. The actual titlebar
-# seen on Dolphin/GNOME Text Editor/etc is drawn entirely by this decoration
+# seen on native-Wayland Qt apps (Konsole, Ark...) is drawn entirely by this decoration
 # config overlay. Never move headerbar_bg_color into this script.
 #
 # Usage: ./set-qt-titlebar-color.sh <new-hex-color>

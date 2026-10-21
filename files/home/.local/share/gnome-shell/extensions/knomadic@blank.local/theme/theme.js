@@ -16,16 +16,10 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {getThemeDirs, getModeThemeDirs} from './util.js';
 
 const SETTINGS_KEY = 'theme-name';
-const OLD_UUID = 'user-theme@gnome-shell-extensions.gcampax.github.com';
 
 export class ThemeManager {
     constructor(settings) {
         this._settings = settings;
-    }
-
-    // Don't fight the stock extension: skip while it is still enabled.
-    static canStart() {
-        return !global.settings.get_strv('enabled-extensions').includes(OLD_UUID);
     }
 
     enable() {

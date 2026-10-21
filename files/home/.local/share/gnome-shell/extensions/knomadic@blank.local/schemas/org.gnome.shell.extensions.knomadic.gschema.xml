@@ -151,7 +151,7 @@
     <key name="topbar-enabled" type="b">
       <default>false</default>
       <summary>Enable Knomadic Top Bar</summary>
-      <description>Run Knomadic's own top bar logic. Disable the Dash to Panel extension first; if both are enabled this stays off.</description>
+      <description>Run Knomadic's own top bar logic.</description>
     </key>
     <key name="topbar-color" type="s">
       <default>'#0d0d0f'</default>

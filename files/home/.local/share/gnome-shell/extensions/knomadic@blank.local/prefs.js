@@ -690,7 +690,29 @@ export default class RoundedWindowsPreferences extends ExtensionPreferences {
 
         // Thunar colours: ONE engine (~/Software/fm-tweaks, config ~/.config/fm-tweaks/fm-tweaks.conf); each row runs `fm-color.sh <key> --get|<hex>`,
         // which regenerates ~/.themes/fm-sample. Restart Thunar to apply. Qt apps without their own section (Konsole, Ark, kcolorchooser) follow these swatches.
-        const thunarGroup = new Adw.PreferencesGroup({ title: _('Thunar Colors'), description: _('Restart Thunar to apply. Konsole, Ark and the colour picker follow these swatches.') });
+        const thunarGroup = new Adw.PreferencesGroup({ title: _('Thunar'), description: _('Restart Thunar to apply. Konsole, Ark and the colour picker follow the colour swatches.') });
+        // Thunar fonts (top of the group): one font button per row, family + size together. Stored by machine-setup/fm-font.sh (~/.config/fm-fonts/thunar.conf), read by thunar-fm at start.
+        thunarGroup.set_title(_('Thunar'));
+        for (const [key, title] of [['font', _('Font / Size')], ['mono', _('Monospace Font / Size')]]) {
+            const btn = new Gtk.FontDialogButton({ dialog: new Gtk.FontDialog(), valign: Gtk.Align.CENTER, level: Gtk.FontLevel.FONT });
+            const script = GLib.build_filenamev([MACHINE_SETUP_DIR, 'fm-font.sh']);
+            let loaded = false;
+            try {
+                const g = Gio.Subprocess.new(['/bin/bash', script, key, '--get'], Gio.SubprocessFlags.STDOUT_PIPE);
+                g.communicate_utf8_async(null, null, (pr, res) => {
+                    try { const [, out] = pr.communicate_utf8_finish(res); if (out && out.trim()) btn.font_desc = Pango.FontDescription.from_string(out.trim()); } catch (e) { /* keep default */ }
+                    loaded = true;
+                });
+            } catch (e) { loaded = true; }
+            btn.connect('notify::font-desc', b => {
+                if (!loaded) return;
+                try { Gio.Subprocess.new(['/bin/bash', script, key, b.font_desc.to_string()], Gio.SubprocessFlags.NONE); } catch (e) { /* ignore */ }
+            });
+            const row = new Adw.ActionRow({ title });
+            row.add_suffix(btn);
+            row.activatable_widget = btn;
+            thunarGroup.add(row);
+        }
         const THUNAR_COLOR_ROWS = [
             // [label, key, fallback hex]
             ['Menu (menus, tooltips, combo popups)', 'tooltip',     '2c2c34'],

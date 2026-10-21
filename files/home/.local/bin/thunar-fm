@@ -10,7 +10,8 @@ printf '@import url("file://%s/.config/gtk-3.0/gtk.css");
 for f in "$HOME"/.config/gtk-4.0/*; do case "$(basename "$f")" in gtk.css) ;; *) ln -s "$f" "$C/gtk-4.0/";; esac; done
 printf '@import url("file://%s/.config/gtk-4.0/gtk.css");\n@import url("file://%s/.themes/fm-sample/gtk4.css");\n' "$HOME" "$HOME" > "$C/gtk-4.0/gtk.css"   # GTK4 dialogs opened by custom actions (zenity)
 printf '[Settings]\ngtk-application-prefer-dark-theme=1\ngtk-icon-theme-name=fm-folders\ngtk-decoration-layout=close,minimize,maximize:\n' > "$C/gtk-3.0/settings.ini"
-printf "[org/gnome/desktop/interface]\nicon-theme='fm-folders'\ncolor-scheme='prefer-dark'\ncursor-theme='Bibata-Modern-Ice'\ncursor-size=22\nfont-name='SF Pro Regular, 14'\n\n[org/gnome/desktop/wm/preferences]\nbutton-layout='close,minimize,maximize:'\n" > "$C/glib-2.0/settings/keyfile"
+FN=$("$HOME/.themes/machine-setup/fm-font.sh" font --get 2>/dev/null); MN=$("$HOME/.themes/machine-setup/fm-font.sh" mono --get 2>/dev/null)   # Knomadic > Thunar font rows
+printf "[org/gnome/desktop/interface]\nicon-theme='fm-folders'\ncolor-scheme='prefer-dark'\ncursor-theme='Bibata-Modern-Ice'\ncursor-size=22\nfont-name='${FN:-SF Pro Regular, 14}'\nmonospace-font-name='${MN:-Monospace 12}'\n\n[org/gnome/desktop/wm/preferences]\nbutton-layout='close,minimize,maximize:'\n" > "$C/glib-2.0/settings/keyfile"
 # private Thunar build (split view focuses the NEW pane: ~/Software/fm-tweaks/patches/thunar-4.20.2-split-focus-new-pane_*.patch); stock thunar if it is missing or built for another package version
 TBIN=$HOME/.local/libexec/thunar-fm/thunar
 [ -x "$TBIN" ] && [ "$(cat "$HOME/.local/libexec/thunar-fm/built-for-package-version" 2>/dev/null)" = "$(rpm -q --qf '%{VERSION}-%{RELEASE}' Thunar 2>/dev/null)" ] || TBIN=thunar

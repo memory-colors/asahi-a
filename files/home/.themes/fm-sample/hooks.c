@@ -194,9 +194,9 @@ static gboolean on_key(void *win, KeyEv *e, gpointer u) {
     return TRUE;
 }
 
-/* ---- rounded row highlight (Dolphin look) ----
+/* ---- rounded row highlight ----
    GTK3 paints a tree row's selection/hover as one rectangle per COLUMN, so CSS cannot round the row ends. After the view has painted, mask the four outer
-   corners of every selected / hovered row with the view background (a square minus a quarter circle). Each row rounds on its own, like Dolphin.
+   corners of every selected / hovered row with the view background (a square minus a quarter circle). Each row rounds on its own.
    Rows end at the visible edge when the columns are wider than the pane. Radius: env FM_ROW_RADIUS (default 5); row gap: env FM_ROW_GAP (px per side, default 1). */
 typedef struct { int x, y, w, h; } Rect;
 typedef struct { double r, g, b, a; } RGBA;
@@ -329,7 +329,7 @@ static gboolean on_press_blank_name(void *tv, void *ev, gpointer u) {
 }
 extern unsigned long gtk_widget_get_type(void);
 /* emission hooks run before every handler (Thunar's own press handler included) */
-/* ---- slow second click on the name of the only selected row = inline rename (like Nautilus/Dolphin). Armed from the press hook (selection state is still pre-click there); fires after the
+/* ---- slow second click on the name of the only selected row = inline rename (like Nautilus). Armed from the press hook (selection state is still pre-click there); fires after the
    double-click interval unless another press / a drag-begin bumped rn_gen. Thunar's name renderer is not editable by default, so it is flipped on for the one edit and back off after. ---- */
 extern int gtk_tree_selection_count_selected_rows(void *);
 extern void *gtk_settings_get_default(void);
@@ -474,12 +474,26 @@ static void rn_align(void *ent, void *alloc, gpointer u) {
     /* select the base name (the whole name for folders); typing replaces it, Right collapses the selection to its end and further Right moves into the extension. The insertion point stays at the START: GtkEntry scrolls to keep it visible, so an insertion point at the end scrolled a long name left by several characters (the original "name shifts left" symptom). */
     gtk_editable_select_region(ent, rn_is_dir(tv, ps) ? -1 : pos, 0);   /* (start, end): the insertion point is END = 0 */
 }
+extern int gtk_widget_get_realized(void *);
+static gboolean rn_select_new_idle(gpointer d) {                                          /* one idle after the first allocation: GTK / Thunar finish placing the cursor first */
+    void *ent = d;
+    if (gtk_widget_get_realized(ent)) {
+        const char *t = gtk_entry_get_text(ent); const char *dot = t ? strrchr(t, '.') : NULL;
+        gtk_editable_select_region(ent, (dot && dot != t) ? (int)g_utf8_pointer_to_offset(t, dot) : -1, 0);
+    }
+    g_object_unref(ent); return G_SOURCE_REMOVE;
+}
+static void rn_select_new(void *ent, void *alloc, gpointer u) {
+    if (g_object_get_data(ent, "fm-rn-sel")) return;
+    g_object_set_data(ent, "fm-rn-sel", (gpointer)1); g_idle_add(rn_select_new_idle, g_object_ref(ent));
+}
 static void rn_started(void *r, void *ent, const char *path, gpointer u) {
     if (rn_ours && G_TYPE_CHECK_INSTANCE_TYPE(ent, g_type_from_name("GtkEntry"))) {
         g_object_set_data(ent, "fm-rn-tv", g_object_get_data(r, "fm-rn-tv")); g_object_set_data(ent, "fm-rn-r", r); g_object_set_data_full(ent, "fm-rn-path", g_strdup(path), g_free);
         rn_apply(ent, -1);                                                                   /* predicted placement, before the first draw */
         g_signal_connect_after(ent, "size-allocate", G_CALLBACK(rn_align), NULL);
-    }
+    } else if (G_TYPE_CHECK_INSTANCE_TYPE(ent, g_type_from_name("GtkEntry")))
+        g_signal_connect_after(ent, "size-allocate", G_CALLBACK(rn_select_new), NULL);   /* Thunar's own edit (right-click New File / New Folder): select the whole base name */
     rn_ours = 0;
 }
 static gboolean rn_fire(gpointer d) {
@@ -599,8 +613,24 @@ static gboolean confirm_key(void *dlg, KeyEv *e, gpointer u) {
     if (cur && g_list_length(bs) > 1) { GList *n = e->keyval == 0xff53 ? (cur->next ? cur->next : bs) : (cur->prev ? cur->prev : g_list_last(bs)); gtk_widget_grab_focus(n->data); g_list_free(bs); return TRUE; }
     g_list_free(bs); return FALSE;
 }
+/* "Create New File" / "Create New Folder" (right-click menu) are small dialogs with a name entry holding "untitled ..." and the cursor at its end: select the whole name so typing replaces it */
+static void *dlg_find_entry(void *w) {
+    if (g_type_check_instance_is_a((GTypeInstance *)w, g_type_from_name("GtkEntry"))) return w;
+    if (g_type_check_instance_is_a((GTypeInstance *)w, gtk_container_get_type()))
+        for (GList *l = gtk_container_get_children(w); l; l = l->next) { void *r = dlg_find_entry(l->data); if (r) return r; }
+    return NULL;
+}
+static gboolean dlg_select_idle(gpointer d) {
+    void *e = dlg_find_entry(d); if (e) { gtk_widget_grab_focus(e); gtk_editable_select_region(e, 0, -1); }
+    g_object_unref(d); return G_SOURCE_REMOVE;
+}
 static gboolean dialog_show_hook(GSignalInvocationHint *ihint, guint n, const GValue *pv, gpointer d) {
     void *w = g_value_get_object(&pv[0]);
+    if (w && g_type_check_instance_is_a((GTypeInstance *)w, g_type_from_name("GtkDialog")) && !g_object_get_data(w, "fm-newsel")) {
+        char *t = NULL; g_object_get(w, "title", &t, NULL);
+        if (t && (!strcmp(t, "Create New File") || !strcmp(t, "Create New Folder"))) { g_object_set_data(w, "fm-newsel", (gpointer)1); g_idle_add(dlg_select_idle, g_object_ref(w)); }
+        g_free(t);
+    }
     if (w && g_type_check_instance_is_a((GTypeInstance *)w, g_type_from_name("GtkMessageDialog")) && !g_object_get_data(w, "fm-confirm")) {
         char *t = NULL; g_object_get(w, "text", &t, NULL);
         if (t && g_str_has_prefix(t, "Are you sure") && strstr(t, "permanently") && strstr(t, "delete")) {                  /* "Are you sure that you want to\npermanently delete ..." (Thunar 4.20 wording; also the "N selected files" variants) */
@@ -616,8 +646,15 @@ static gboolean dialog_show_hook(GSignalInvocationHint *ihint, guint n, const GV
     }
     return TRUE;
 }
+static gboolean editing_started_hook(GSignalInvocationHint *ihint, guint n, const GValue *pv, gpointer d) {   /* every cell edit in the process: Thunar's own (New File / New Folder / F2) selects only the cursor end, so select the base name */
+    void *ent = n > 1 && G_VALUE_HOLDS_OBJECT(&pv[1]) ? g_value_get_object(&pv[1]) : NULL;
+    if (!rn_ours && ent && G_TYPE_CHECK_INSTANCE_TYPE(ent, g_type_from_name("GtkEntry")) && !g_object_get_data(ent, "fm-rn-sel")) { g_object_set_data(ent, "fm-rn-sel", (gpointer)1); g_idle_add(rn_select_new_idle, g_object_ref(ent)); }
+    return TRUE;
+}
+extern unsigned long gtk_cell_renderer_get_type(void);
 static void install_dialog_hook(void) {
     static int done; if (done) return; done = 1;
+    { unsigned long crt = gtk_cell_renderer_get_type(); g_type_class_ref(crt); g_signal_add_emission_hook(g_signal_lookup("editing-started", crt), 0, editing_started_hook, NULL, NULL); }   /* the class must exist or the signal id is 0 */
     g_signal_add_emission_hook(g_signal_lookup("show", gtk_widget_get_type()), 0, dialog_show_hook, NULL, NULL);
 }
 static void install_press_hook(void) {
@@ -985,19 +1022,81 @@ static int sb_snap_y(void *tv, int *xp, int y) {
     return wy;
 }
 static int sb_reentry;
+/* 2026-10-19: a drop on the MIDDLE of an item row (Home, a bookmark, a device) is no longer refused/redirected: Thunar handles it as "drop INTO that folder", but the action is forced to ASK, i.e. Thunar's
+   own Copy Here / Move Here / (Link Here, hidden via fm-menu-hide.txt) / Cancel menu, so nothing is ever moved silently. If the source does not offer ASK it falls back to COPY, never MOVE. */
+extern int gtk_tree_model_get_iter(void *, TIter *, void *);
+extern void gdk_drag_status(void *, int, unsigned);
+extern int gdk_drag_context_get_actions(void *);
+static int sb_mid(void *tv, int x, int y) {
+    void *path = NULL; int pos = 0, ok = 0; TIter it;
+    if (!gtk_tree_view_get_dest_row_at_pos(tv, x, y, &path, &pos) || !path) return 0;
+    void *m = gtk_tree_view_get_model(tv);
+    if (pos >= 2 /* GTK_TREE_VIEW_DROP_INTO_OR_BEFORE / _AFTER */ && gtk_tree_model_get_iter(m, &it, path)) ok = sb_col_bool(m, &it, 1);   /* col 1 = item row (not a group header) */
+    gtk_tree_path_free(path); return ok;
+}
 static gboolean sb_drag_motion(void *tv, void *ctx, int x, int y, unsigned time, gpointer u) {
-    int ny; gboolean ret = FALSE; if (sb_reentry || (ny = sb_snap_y(tv, &x, y)) < 0) return FALSE;
+    int ny; gboolean ret = FALSE; if (sb_reentry || sb_mid(tv, x, y)) return FALSE;        /* a row middle: Thunar's own "drop into" acceptance */
+    if ((ny = sb_snap_y(tv, &x, y)) < 0) return FALSE;
     sb_reentry = 1; g_signal_emit_by_name(tv, "drag-motion", ctx, x, ny, time, &ret); sb_reentry = 0;
     g_signal_stop_emission_by_name(tv, "drag-motion"); return ret;
 }
+static void sb_showall_done(void *menu, gpointer u);
+typedef struct { void *tv, *ctx; int x, y; unsigned time; int act, picked; } SbAsk;
+extern void gtk_drag_finish(void *, int, int, unsigned);
+extern void gtk_menu_attach_to_widget(void *, void *, void *);
+static int sb_ask_done;                                                                  /* set while the chosen action is being replayed through Thunar's drop handler */
+static void *sb_copy_ctx;                                                                 /* drag context of a picked "Copy Here": the data-received step hands the copy to Thunar's file-manager service instead */
+static void sb_ask_replay(SbAsk *a) {
+    gboolean ret = FALSE; sb_ask_done = 1; g_signal_emit_by_name(a->tv, "drag-drop", a->ctx, a->x, a->y, a->time, &ret); sb_ask_done = 0;
+    if (!ret) { sb_copy_ctx = NULL; gtk_drag_finish(a->ctx, FALSE, FALSE, a->time); }
+}
+static void sb_ask_pick(void *item, gpointer d) {
+    SbAsk *a = d;
+    a->picked = 1;
+    if (!a->act) { gtk_drag_finish(a->ctx, FALSE, FALSE, a->time); return; }
+    g_object_ref(a->ctx); gdk_drag_status(a->ctx, a->act, a->time);
+    /* Wayland confirms a changed action only asynchronously and never after the drop, so Thunar would still see its default (MOVE on one drive): a Copy is therefore done by Thunar's own CopyInto service call (own progress window) */
+    if (a->act == 2) sb_copy_ctx = a->ctx;
+    sb_ask_replay(a);
+}
+static void sb_ask_free(void *menu, gpointer d) { SbAsk *a = d; if (a->picked && a->act) g_object_unref(a->ctx); g_free(a); }   /* the item owns its job: freed once with the menu (a picked Copy/Move also holds a context ref) */
 static gboolean sb_drag_drop(void *tv, void *ctx, int x, int y, unsigned time, gpointer u) {
-    int ny; gboolean ret = FALSE; if (sb_reentry || (ny = sb_snap_y(tv, &x, y)) < 0) return FALSE;
+    int ny; gboolean ret = FALSE; if (sb_reentry || sb_ask_done) return FALSE;
+    if (sb_mid(tv, x, y)) {
+        /* Copy Here / Move Here / Cancel before anything happens (the source only offers COPY/MOVE on a left-button drag, so Thunar would act silently) */
+        int acts = gdk_drag_context_get_actions(ctx); void *menu = gtk_menu_new(); const char *lab[3] = {"Copy Here", "Move Here", "Cancel"}; int val[3] = {2, 4, 0};
+        for (int i = 0; i < 3; i++) {
+            if (i == 1 && !(acts & 4)) continue;
+            SbAsk *a = g_new0(SbAsk, 1); a->tv = tv; a->ctx = ctx; a->x = x; a->y = y; a->time = time; a->act = val[i];
+            void *it = gtk_menu_item_new_with_label(lab[i]); g_signal_connect(it, "activate", G_CALLBACK(sb_ask_pick), a); g_signal_connect(it, "destroy", G_CALLBACK(sb_ask_free), a); /* free with the item */
+            gtk_menu_shell_append(menu, it); gtk_widget_show(it);
+        }
+        gtk_menu_attach_to_widget(menu, tv, NULL); gtk_widget_show_all(menu); g_object_set_data(menu, "fm-laid", (gpointer)1);
+        g_signal_connect(menu, "deactivate", G_CALLBACK(sb_showall_done), NULL);
+        gtk_menu_popup_at_pointer(menu, NULL); g_signal_stop_emission_by_name(tv, "drag-drop"); return TRUE;
+    }
+    if ((ny = sb_snap_y(tv, &x, y)) < 0) return FALSE;
     sb_reentry = 1; g_signal_emit_by_name(tv, "drag-drop", ctx, x, ny, time, &ret); sb_reentry = 0;
     g_signal_stop_emission_by_name(tv, "drag-drop"); return ret;
 }
+extern char **gtk_selection_data_get_uris(void *);
 static int sb_reentry_recv;                                                              /* own guard: GTK delivers the data (with the ORIGINAL pointer y) from inside the drag-drop re-emission, so it must not share sb_reentry */
 static void sb_drag_received(void *tv, void *ctx, int x, int y, void *sel, unsigned info, unsigned time, gpointer u) {
-    int ny; if (sb_reentry_recv || (ny = sb_snap_y(tv, &x, y)) < 0) return;
+    if (ctx && ctx == sb_copy_ctx) {
+        sb_copy_ctx = NULL; char **uris = gtk_selection_data_get_uris(sel); void *path = NULL; int pos = 0; TIter it; char *tgt = NULL;
+        if (gtk_tree_view_get_dest_row_at_pos(tv, x, y, &path, &pos) && path) {
+            void *m = gtk_tree_view_get_model(tv);
+            if (gtk_tree_model_get_iter(m, &it, path)) { GValue v = G_VALUE_INIT; gtk_tree_model_get_value(m, &it, 6, &v); if (G_VALUE_HOLDS_OBJECT(&v) && g_value_get_object(&v)) tgt = g_file_get_uri(g_value_get_object(&v)); g_value_unset(&v); }
+            gtk_tree_path_free(path);
+        }
+        if (uris && tgt) {
+            GDBusConnection *bus = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);
+            if (bus) { g_dbus_connection_call(bus, "org.xfce.FileManager", "/org/xfce/FileManager", "org.xfce.FileManager", "CopyInto", g_variant_new("(s^ass" "ss)", "/", uris, tgt, "", ""), NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, NULL, NULL); g_object_unref(bus); }
+        }
+        gtk_drag_finish(ctx, uris && tgt, FALSE, time); g_strfreev(uris); g_free(tgt);
+        g_signal_stop_emission_by_name(tv, "drag-data-received"); return;
+    }
+    int ny; if (sb_reentry_recv || sb_mid(tv, x, y) || (ny = sb_snap_y(tv, &x, y)) < 0) return;
     sb_reentry_recv = 1; g_signal_emit_by_name(tv, "drag-data-received", ctx, x, ny, sel, info, time); sb_reentry_recv = 0;
     g_signal_stop_emission_by_name(tv, "drag-data-received");
 }

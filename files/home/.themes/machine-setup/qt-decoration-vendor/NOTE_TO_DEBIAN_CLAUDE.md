@@ -2,7 +2,7 @@
 
 This folder (`~/.local/share/qt-decoration-vendor/` once extracted from the
 theme archive) contains a working, already-patched Qt Wayland decoration
-plugin - it makes Qt/KDE apps (Dolphin, Konsole, Gwenview, etc.) get a
+plugin - it makes Qt/KDE apps (Konsole, Ark, etc.) get a
 custom titlebar under GNOME/Wayland instead of none at all. It was built and
 visually verified on Asahi Fedora (aarch64); it needs a fresh compile here
 because it's architecture-specific machine code, not because anything about
@@ -21,7 +21,7 @@ are completely portable.
 3. A logout is needed for the environment.d change to take effect for new
    sessions (or set `QT_PLUGIN_PATH`/`QT_WAYLAND_DECORATION` directly in the
    current shell to test one app without logging out).
-4. Open a Qt app (Dolphin is the easiest test) and confirm: thin titlebar, no
+4. Open a Qt app (Konsole is the easiest test) and confirm: thin titlebar, no
    title text, dark `#1d1d20`-ish background, red/yellow/green traffic-light
    buttons top-left, no title text.
 

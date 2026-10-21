@@ -15,14 +15,12 @@ import St from 'gi://St'
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js'
 import { WindowPreview } from 'resource:///org/gnome/shell/ui/windowPreview.js'
-import { ExtensionState } from 'resource:///org/gnome/shell/misc/extensionUtils.js'
 
 import * as Intellihide from './intellihide.js'
 import * as Proximity from './proximity.js'
 import * as Utils from './utils.js'
 import { initContext, destroyContext } from './context.js'
 
-const D2P_UUID = 'dash-to-panel@blank.local'
 const KEY_TOGGLE = 'topbar-intellihide-key-toggle'
 
 export class TopBar {
@@ -30,12 +28,6 @@ export class TopBar {
     this._settings = settings
     this._signals = new Utils.GlobalSignalsHandler()
     this._running = false
-  }
-
-  // true when it is safe to start (Dash to Panel must not also be driving the panel)
-  static canStart() {
-    const d2p = Main.extensionManager?.lookup(D2P_UUID)
-    return !d2p || (d2p.state !== ExtensionState.ACTIVE && d2p.state !== ExtensionState.ACTIVATING)
   }
 
   enable() {

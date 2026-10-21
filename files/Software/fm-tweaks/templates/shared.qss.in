@@ -1,5 +1,5 @@
-/* SHARED look (templates/shared.qss.in): rounded context menus + tooltips + the Open With dialog. Safe to load globally (e.g. qt6ct stylesheets=)
-   or per app; the Dolphin-only rules live in dolphin.qss.in. GENERATED output - edit the template / dolphin-tweaks.conf, not this file. */
+/* SHARED look (templates/shared.qss.in): rounded context menus + tooltips + the Open With dialog, loaded per wrapped Qt app.
+   GENERATED output - edit the template / fm-tweaks.conf, not this file. */
 QMenu {
     background-color: {{tooltip}};
     border: 1px solid #45454d;

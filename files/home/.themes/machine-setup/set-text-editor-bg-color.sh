@@ -7,11 +7,8 @@
 #   1. Writing `window.*.background` rules to gtk-4.0/gtk.css - wrong,
 #      that's window chrome, not the content canvas.
 #   2. Editing GtkSourceView style-scheme XML files' `text`/
-#      `background-pattern` colors (first in the wrong directory
-#      entirely - libgedit-gtksourceview-300, which this binary never
-#      reads, confirmed via `ldd` showing it links plain
-#      libgtksourceview-5.so.0 - then in the CORRECT directory,
-#      ~/.local/share/gtksourceview-5/styles/, confirmed via the live
+#      `background-pattern` colors in ~/.local/share/gtksourceview-5/styles/
+#      (the binary links libgtksourceview-5.so.0), confirmed via the live
 #      Preferences theme-picker thumbnails actually re-rendering with the
 #      edited color). Even with the right file, the real editor canvas
 #      STILL didn't change on a full, user-confirmed app restart.
