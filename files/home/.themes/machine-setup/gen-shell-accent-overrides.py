@@ -79,7 +79,6 @@ def main():
     else:
         i = text.index(GREY_BEGIN)
         text = text[:i] + block + '\n' + text[i:]
-    shutil.copy(CSS, CSS + '.bak-pre-accent-unify')
     open(CSS, 'w').write(text)
     print('accent #%s: wrote %d rules (%d declarations)' % (hexv, n_rules, n_decl))
 

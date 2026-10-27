@@ -257,16 +257,87 @@
    else
 --- a/thunar/thunar-dialogs.c
 +++ b/thunar/thunar-dialogs.c
-@@ -789,6 +789,8 @@
+@@ -719,6 +719,49 @@
+ 
+ 
+ 
++/* the collision dialog's body text is 2 pt smaller than the normal text */
++static void
++thunar_dialog_label_shrink (GtkWidget *label,
++                            gint       points)
++{
++  PangoFontDescription *desc = NULL;
++  PangoAttrList        *attrs = pango_attr_list_new ();
++  GtkStyleContext      *context = gtk_widget_get_style_context (label);
++
++  gtk_style_context_get (context, gtk_style_context_get_state (context), "font", &desc, NULL);
++  if (desc != NULL && pango_font_description_get_size (desc) > points * PANGO_SCALE)
++    {
++      gint size = pango_font_description_get_size (desc) - points * PANGO_SCALE;
++      pango_attr_list_insert (attrs, pango_attr_size_new (size));
++      gtk_label_set_attributes (GTK_LABEL (label), attrs);
++    }
++  if (desc != NULL)
++    pango_font_description_free (desc);
++  pango_attr_list_unref (attrs);
++}
++
++
++
++static void
++thunar_dialog_label_smaller (GtkWidget *label)
++{
++  thunar_dialog_label_shrink (label, 2);
++}
++
++
++
++static void
++thunar_dialog_button_smaller (GtkWidget *button,
++                              gpointer   data)
++{
++  GtkWidget *child = gtk_bin_get_child (GTK_BIN (button));
++
++  if (GTK_IS_LABEL (child))
++    thunar_dialog_label_shrink (child, 1);
++}
++
++
++
+ static void
+ thunar_dialog_image_redraw (GtkWidget          *image,
+                             ThunarThumbnailSize size,
+@@ -768,18 +811,16 @@
+   ThunarIconFactory *icon_factory;
+   ThunarPreferences *preferences;
+   ThunarDateStyle    date_style;
+-  ThunarFile        *parent_file;
+   GtkIconTheme      *icon_theme;
+   GtkWidget         *dialog;
+   GtkWidget         *grid;
+-  GtkWidget         *image, *src_image, *dst_image;
++  GtkWidget         *src_image, *dst_image;
+   GtkWidget         *label;
+   GtkWidget         *content_area;
+   GtkWidget         *action_area;
+   GtkWidget         *check_button;
+   GdkPixbuf         *icon;
+   cairo_surface_t   *surface;
+-  const gchar       *parent_string = "";
+   gchar             *date_custom_style;
+   gchar             *date_string;
+   gchar             *size_string;
+@@ -789,6 +830,9 @@
    gint               row = 0;
    gint               scale_factor;
    gint               width;
++  gint               label_row, info_row;
 +  gboolean           folder_merge;
 +  gboolean           mismatch;
  
    _thunar_return_val_if_fail (parent == NULL || GTK_IS_WINDOW (parent), THUNAR_JOB_RESPONSE_CANCEL);
    _thunar_return_val_if_fail (THUNAR_IS_FILE (src_file), THUNAR_JOB_RESPONSE_CANCEL);
-@@ -802,15 +804,25 @@
+@@ -802,15 +846,27 @@
    g_object_unref (G_OBJECT (preferences));
  
    /* setup the confirmation dialog */
@@ -296,13 +367,39 @@
 +    gtk_dialog_add_button (GTK_DIALOG (dialog), _("_Overwrite"), THUNAR_JOB_RESPONSE_REPLACE);
 +  /* Enter must never overwrite or merge anything: the safe answer is the default */
 +  gtk_dialog_set_default_response (GTK_DIALOG (dialog), folder_merge ? THUNAR_JOB_RESPONSE_CANCEL : THUNAR_JOB_RESPONSE_SKIP);
++
++  gtk_window_set_decorated (GTK_WINDOW (dialog), FALSE); /* a plain pop-up: no title bar, no close button */
  
    content_area = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
  
-@@ -847,26 +859,10 @@
-   gtk_grid_attach (GTK_GRID (grid), image, 0, row, 1, 1);
-   gtk_widget_show (image);
+@@ -818,7 +874,8 @@
+   action_area = gtk_dialog_get_action_area (GTK_DIALOG (dialog));
+   G_GNUC_END_IGNORE_DEPRECATIONS
+   gtk_button_box_set_layout (GTK_BUTTON_BOX (action_area), GTK_BUTTONBOX_SPREAD);
+-  gtk_widget_set_margin_bottom (GTK_WIDGET (action_area), 3);
++  gtk_container_foreach (GTK_CONTAINER (action_area), thunar_dialog_button_smaller, NULL);
++  gtk_widget_set_margin_bottom (GTK_WIDGET (action_area), 10);
  
+   if (parent != NULL)
+     scale_factor = gtk_widget_get_scale_factor (GTK_WIDGET (parent));
+@@ -834,127 +891,91 @@
+   gtk_grid_set_row_spacing (GTK_GRID (grid), 6);
+   gtk_container_set_border_width (GTK_CONTAINER (grid), 10);
+   gtk_box_pack_start (GTK_BOX (content_area), grid, TRUE, FALSE, 0);
++  gtk_widget_set_margin_top (grid, 4);
+   gtk_widget_show (grid);
+ 
+-  image = gtk_image_new_from_icon_name ("stock_folder-copy", GTK_ICON_SIZE_BUTTON);
+-  gtk_widget_set_halign (image, GTK_ALIGN_CENTER);
+-  gtk_widget_set_valign (image, GTK_ALIGN_START);
+-  gtk_widget_set_margin_start (GTK_WIDGET (image), 6);
+-  gtk_widget_set_margin_end (GTK_WIDGET (image), 6);
+-  gtk_widget_set_margin_top (GTK_WIDGET (image), 6);
+-  gtk_widget_set_margin_bottom (GTK_WIDGET (image), 6);
+-  gtk_widget_set_vexpand (image, TRUE);
+-  gtk_grid_attach (GTK_GRID (grid), image, 0, row, 1, 1);
+-  gtk_widget_show (image);
+-
 -  if (thunar_file_is_symlink (dst_file))
 -    {
 -      text = g_strdup_printf (_("This folder already contains a symbolic link \"%s\"."),
@@ -323,14 +420,41 @@
 -        text = g_strdup_printf (_("This folder already contains a file \"%s\"."),
 -                                thunar_file_get_display_name (dst_file));
 -    }
-+  parent_file = thunar_file_get_parent (dst_file, NULL);
-+  if (parent_file != NULL)
-+    parent_string = thunar_file_get_basename (parent_file);
-+  text = g_strdup_printf (_("\"%s\" already exists in \"%s\"."), thunar_file_get_display_name (dst_file), parent_string);
++  text = g_strdup (thunar_file_is_symlink (dst_file) ? _("link already exists") : (thunar_file_is_directory (dst_file) ? _("folder already exists") : _("file already exists")));
  
    label = gtk_label_new (text);
    gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
-@@ -880,19 +876,33 @@
+-  gtk_label_set_attributes (GTK_LABEL (label), thunar_pango_attr_list_big_bold ());
++  {
++    PangoAttrList        *heading = pango_attr_list_new ();
++    PangoFontDescription *desc = NULL;
++    GtkStyleContext      *context = gtk_widget_get_style_context (label);
++    const gchar          *family;
++
++    pango_attr_list_insert (heading, pango_attr_scale_new (PANGO_SCALE_LARGE));
++    /* the UI font is installed as one family per weight ("SF Pro Regular"), so a weight attribute alone changes nothing: pick the Semibold family */
++    gtk_style_context_get (context, gtk_style_context_get_state (context), "font", &desc, NULL);
++    family = desc != NULL ? pango_font_description_get_family (desc) : NULL;
++    if (family != NULL && g_str_has_suffix (family, " Regular"))
++      {
++        gchar *bold = g_strdup_printf ("%.*s Semibold", (int) (strlen (family) - strlen (" Regular")), family);
++        pango_attr_list_insert (heading, pango_attr_family_new (bold));
++        g_free (bold);
++      }
++    else
++      pango_attr_list_insert (heading, pango_attr_weight_new (PANGO_WEIGHT_SEMIBOLD));
++    if (desc != NULL)
++      pango_font_description_free (desc);
++    gtk_label_set_attributes (GTK_LABEL (label), heading);
++    pango_attr_list_unref (heading);
++  }
+   gtk_label_set_selectable (GTK_LABEL (label), TRUE);
+   gtk_label_set_line_wrap (GTK_LABEL (label), TRUE);
+   gtk_label_set_line_wrap_mode (GTK_LABEL (label), PANGO_WRAP_CHAR);
+   thunar_gtk_label_disable_hyphens (GTK_LABEL (label));
+   gtk_widget_set_hexpand (label, TRUE);
+-  gtk_grid_attach (GTK_GRID (grid), label, 1, row, 2, 1);
++  gtk_grid_attach (GTK_GRID (grid), label, 1, row, 4, 1);
    gtk_widget_show (label);
    g_free (text);
  
@@ -346,54 +470,75 @@
 -    text = g_strdup_printf (_("Replace the existing folder in \"%s\""), parent_string);
 +  /* the comparison sentence: size and modified time of the incoming item against the existing one (time within 2 s = equal: FAT / exFAT keep 2 s resolution) */
 +  if (folder_merge)
-+    text = g_strdup (_("Merging combines both folders. Files that exist in both will be asked about next."));
++    text = NULL; /* folder clash: no sentence, the labels and buttons say it all */
 +  else if (mismatch)
 +    text = g_strdup (_("A file and a folder (or a link) cannot be merged or overwritten. Rename or skip the incoming item."));
    else
 -    /* TRANSLATORS: First part of replace dialog sentence */
 -    text = g_strdup_printf (_("Replace the existing file in \"%s\""), parent_string);
 +    {
-+      guint64 ssz = thunar_file_get_size (src_file), dsz = thunar_file_get_size (dst_file);
-+      gint64  smt = (gint64) thunar_file_get_date (src_file, THUNAR_FILE_DATE_MODIFIED), dmt = (gint64) thunar_file_get_date (dst_file, THUNAR_FILE_DATE_MODIFIED);
-+      gchar  *ssz_s = thunar_file_get_size_string_long (src_file, file_size_binary), *dsz_s = thunar_file_get_size_string_long (dst_file, file_size_binary);
-+      gchar  *sdt_s = thunar_file_get_date_string (src_file, THUNAR_FILE_DATE_MODIFIED, date_style, date_custom_style), *ddt_s = thunar_file_get_date_string (dst_file, THUNAR_FILE_DATE_MODIFIED, date_style, date_custom_style);
-+      const gchar *name = thunar_file_get_display_name (dst_file);
-+      gboolean same_size = (ssz == dsz), same_time = (ABS (smt - dmt) <= 2);
-+      gchar *l1 = NULL, *l2 = NULL;
-+
-+      if (same_size && same_time)
-+        text = g_strdup (_("The files appear identical (same size and modified date)."));
-+      else
-+        {
-+          if (!same_size)
-+            l1 = g_strdup_printf (ssz > dsz ? _("Incoming \"%s\" (%s) is larger than existing \"%s\" (%s).") : _("Incoming \"%s\" (%s) is smaller than existing \"%s\" (%s)."), name, ssz_s, name, dsz_s);
-+          if (!same_time)
-+            l2 = g_strdup_printf (smt > dmt ? _("Incoming \"%s\" (%s) is newer than existing \"%s\" (%s).") : _("Incoming \"%s\" (%s) is older than existing \"%s\" (%s)."), name, sdt_s, name, ddt_s);
-+          text = g_strdup_printf ("%s%s%s", l1 != NULL ? l1 : "", (l1 != NULL && l2 != NULL) ? "\n" : "", l2 != NULL ? l2 : "");
-+        }
-+      g_free (l1); g_free (l2); g_free (ssz_s); g_free (dsz_s); g_free (sdt_s); g_free (ddt_s);
++      gboolean same = thunar_file_get_size (src_file) == thunar_file_get_size (dst_file)
++                      && ABS ((gint64) thunar_file_get_date (src_file, THUNAR_FILE_DATE_MODIFIED) - (gint64) thunar_file_get_date (dst_file, THUNAR_FILE_DATE_MODIFIED)) <= 2;
+ 
+-  if (parent_file != NULL)
+-    g_object_unref (parent_file);
++      text = same ? g_strdup (_("The files appear identical.")) : NULL;
 +    }
  
-   if (parent_file != NULL)
-     g_object_unref (parent_file);
-@@ -911,6 +921,15 @@
+-  /* next row */
+-  row++;
++  if (text != NULL)
++    {
++      /* next row */
++      row++;
+ 
+-  label = gtk_label_new (text);
+-  gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
+-  gtk_label_set_ellipsize (GTK_LABEL (label), PANGO_ELLIPSIZE_MIDDLE);
+-  gtk_widget_set_hexpand (label, TRUE);
+-  gtk_grid_attach (GTK_GRID (grid), label, 1, row, 2, 1);
+-  gtk_widget_show (label);
+-  g_free (text);
++      label = gtk_label_new (text);
++      gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
++      gtk_label_set_ellipsize (GTK_LABEL (label), PANGO_ELLIPSIZE_MIDDLE);
++      gtk_widget_set_hexpand (label, TRUE);
++      gtk_grid_attach (GTK_GRID (grid), label, 1, row, 4, 1);
++      thunar_dialog_label_smaller (label);
++      gtk_widget_show (label);
++      g_free (text);
++    }
+ 
    /* next row */
    row++;
  
-+  label = gtk_label_new (folder_merge ? _("Existing folder:") : (thunar_file_is_directory (dst_file) ? _("Existing folder:") : _("Existing file:")));
-+  gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
-+  gtk_widget_set_hexpand (label, TRUE);
-+  gtk_grid_attach (GTK_GRID (grid), label, 1, row, 2, 1);
-+  gtk_widget_show (label);
-+
-+  /* next row */
-+  row++;
-+
-   icon = thunar_icon_factory_load_file_icon (icon_factory, dst_file, THUNAR_FILE_ICON_STATE_DEFAULT, 48, scale_factor, FALSE, NULL);
-   surface = gdk_cairo_surface_create_from_pixbuf (icon, scale_factor, NULL);
-   dst_image = gtk_image_new_from_surface (surface);
-@@ -940,13 +959,13 @@
- 
+-  icon = thunar_icon_factory_load_file_icon (icon_factory, dst_file, THUNAR_FILE_ICON_STATE_DEFAULT, 48, scale_factor, FALSE, NULL);
+-  surface = gdk_cairo_surface_create_from_pixbuf (icon, scale_factor, NULL);
+-  dst_image = gtk_image_new_from_surface (surface);
+-  gtk_widget_set_margin_start (GTK_WIDGET (dst_image), 6);
+-  gtk_widget_set_margin_end (GTK_WIDGET (dst_image), 6);
+-  gtk_widget_set_margin_top (GTK_WIDGET (dst_image), 6);
+-  gtk_widget_set_margin_bottom (GTK_WIDGET (dst_image), 6);
+-  gtk_grid_attach (GTK_GRID (grid), dst_image, 1, row, 1, 1);
+-  g_object_unref (G_OBJECT (icon));
+-  cairo_surface_destroy (surface);
+-  gtk_widget_show (dst_image);
+-
+-  g_signal_connect_swapped (G_OBJECT (dst_file), "thumbnail-updated", G_CALLBACK (thunar_dialog_image_redraw), dst_image);
+-  thunar_file_request_thumbnail (dst_file, thunar_icon_size_to_thumbnail_size (48 * scale_factor));
+-
+-  size_string = thunar_file_get_size_string_long (dst_file, file_size_binary);
+-  date_string = thunar_file_get_date_string (dst_file, THUNAR_FILE_DATE_MODIFIED, date_style, date_custom_style);
+-  text = g_strdup_printf ("%s %s\n%s %s", _("Size:"), size_string, _("Modified:"), date_string);
+-  label = gtk_label_new (text);
+-  gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
+-  gtk_widget_set_hexpand (label, TRUE);
+-  gtk_grid_attach (GTK_GRID (grid), label, 2, row, 1, 1);
+-  gtk_widget_show (label);
+-  g_free (size_string);
+-  g_free (date_string);
+-  g_free (text);
+-
    if (thunar_file_is_symlink (src_file))
      /* TRANSLATORS: Second part of replace dialog sentence */
 -    text = g_strdup_printf (_("with the following link?"));
@@ -405,11 +550,83 @@
    else
      /* TRANSLATORS: Second part of replace dialog sentence */
 -    text = g_strdup_printf (_("with the following file?"));
+-
+-  /* next row */
+-  row++;
 +    text = g_strdup_printf (_("Incoming file:"));
  
-   /* next row */
-   row++;
-@@ -989,12 +1008,14 @@
+   label = gtk_label_new (text);
+   gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
+   gtk_widget_set_hexpand (label, TRUE);
+   gtk_grid_attach (GTK_GRID (grid), label, 1, row, 2, 1);
++  thunar_dialog_label_smaller (label);
+   gtk_widget_show (label);
+   g_free (text);
+ 
+@@ -983,20 +1004,80 @@
+   gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
+   gtk_widget_set_hexpand (label, TRUE);
+   gtk_grid_attach (GTK_GRID (grid), label, 2, row, 1, 1);
++  thunar_dialog_label_smaller (label);
++  gtk_widget_show (label);
++  g_free (size_string);
++  g_free (date_string);
++  g_free (text);
++
++  label_row = row - 1;
++  info_row = row;
++
++  {
++    /* "Existing file (larger, newer):" - how the existing file compares with the incoming one; nothing in brackets when they match */
++    gchar *kind = NULL, *how = NULL;
++
++    if (!folder_merge && !mismatch)
++      {
++        guint64 ssz = thunar_file_get_size (src_file), dsz = thunar_file_get_size (dst_file);
++        gint64  smt = (gint64) thunar_file_get_date (src_file, THUNAR_FILE_DATE_MODIFIED), dmt = (gint64) thunar_file_get_date (dst_file, THUNAR_FILE_DATE_MODIFIED);
++        const gchar *w1 = ssz == dsz ? NULL : (dsz > ssz ? _("larger") : _("smaller"));
++        const gchar *w2 = ABS (smt - dmt) <= 2 ? NULL : (dmt > smt ? _("newer") : _("older"));
++
++        if (w1 != NULL || w2 != NULL)
++          how = g_strdup_printf (" (%s%s%s)", w1 != NULL ? w1 : "", (w1 != NULL && w2 != NULL) ? ", " : "", w2 != NULL ? w2 : "");
++      }
++    kind = g_strdup_printf ("%s%s:", (folder_merge || thunar_file_is_directory (dst_file)) ? _("Existing folder") : _("Existing file"), how != NULL ? how : "");
++    label = gtk_label_new (kind);
++    g_free (kind);
++    g_free (how);
++  }
++  gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
++  gtk_widget_set_hexpand (label, TRUE);
++  gtk_grid_attach (GTK_GRID (grid), label, 3, label_row, 2, 1);
++  thunar_dialog_label_smaller (label);
++  gtk_widget_show (label);
++
++  icon = thunar_icon_factory_load_file_icon (icon_factory, dst_file, THUNAR_FILE_ICON_STATE_DEFAULT, 48, scale_factor, FALSE, NULL);
++  surface = gdk_cairo_surface_create_from_pixbuf (icon, scale_factor, NULL);
++  dst_image = gtk_image_new_from_surface (surface);
++  gtk_widget_set_margin_start (GTK_WIDGET (dst_image), 6);
++  gtk_widget_set_margin_end (GTK_WIDGET (dst_image), 6);
++  gtk_widget_set_margin_top (GTK_WIDGET (dst_image), 6);
++  gtk_widget_set_margin_bottom (GTK_WIDGET (dst_image), 6);
++  gtk_grid_attach (GTK_GRID (grid), dst_image, 3, info_row, 1, 1);
++  g_object_unref (G_OBJECT (icon));
++  cairo_surface_destroy (surface);
++  gtk_widget_show (dst_image);
++
++  g_signal_connect_swapped (G_OBJECT (dst_file), "thumbnail-updated", G_CALLBACK (thunar_dialog_image_redraw), dst_image);
++  thunar_file_request_thumbnail (dst_file, thunar_icon_size_to_thumbnail_size (48 * scale_factor));
++
++  size_string = thunar_file_get_size_string_long (dst_file, file_size_binary);
++  date_string = thunar_file_get_date_string (dst_file, THUNAR_FILE_DATE_MODIFIED, date_style, date_custom_style);
++  text = g_strdup_printf ("%s %s\n%s %s", _("Size:"), size_string, _("Modified:"), date_string);
++  label = gtk_label_new (text);
++  gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
++  gtk_widget_set_hexpand (label, TRUE);
++  gtk_grid_attach (GTK_GRID (grid), label, 4, info_row, 1, 1);
++  thunar_dialog_label_smaller (label);
+   gtk_widget_show (label);
+   g_free (size_string);
+   g_free (date_string);
    g_free (text);
    g_free (date_custom_style);
  
@@ -422,9 +639,13 @@
  
 -      check_button = gtk_check_button_new_with_mnemonic (_("_Apply the action to all files and folders"));
 +      check_button = gtk_check_button_new_with_mnemonic (_("_Apply to All"));
++      thunar_dialog_label_smaller (gtk_bin_get_child (GTK_BIN (check_button)));
        gtk_widget_set_margin_top (check_button, 6);
-       gtk_grid_attach (GTK_GRID (grid), check_button, 0, row, 3, 1);
+-      gtk_grid_attach (GTK_GRID (grid), check_button, 0, row, 3, 1);
++      gtk_grid_attach (GTK_GRID (grid), check_button, 1, row, 4, 1);
        gtk_widget_show (check_button);
+     }
+ 
 --- a/thunar/thunar-job.c
 +++ b/thunar/thunar-job.c
 @@ -70,6 +70,7 @@
@@ -513,6 +734,25 @@
  /* thunar_job_operation_new_invert:
   * @job_operation: a #ThunarJobOperation
   *
+@@ -327,7 +336,17 @@
+     case THUNAR_JOB_OPERATION_KIND_COPY:
+       inverted_operation = g_object_new (THUNAR_TYPE_JOB_OPERATION, NULL);
+       inverted_operation->operation_kind = THUNAR_JOB_OPERATION_KIND_DELETE;
+-      inverted_operation->source_file_list = thunar_g_list_copy_deep (job_operation->target_file_list);
++      /* a copy that overwrote a file cannot give the original back, so undo must not delete that path either: it would leave
++       * neither version. Only what the copy newly created is removed. */
++      for (GList *lp = job_operation->target_file_list; lp != NULL; lp = lp->next)
++        {
++          gboolean overwritten = FALSE;
++
++          for (GList *op = job_operation->overwritten_files; op != NULL && !overwritten; op = op->next)
++            overwritten = g_file_equal (lp->data, op->data);
++          if (!overwritten)
++            inverted_operation->source_file_list = thunar_g_list_append_deep (inverted_operation->source_file_list, lp->data);
++        }
+       break;
+ 
+     case THUNAR_JOB_OPERATION_KIND_MOVE:
 --- a/thunar/thunar-job-operation.h
 +++ b/thunar/thunar-job-operation.h
 @@ -37,6 +37,8 @@
@@ -524,3 +764,72 @@
  ThunarJobOperation *
  thunar_job_operation_new_invert (ThunarJobOperation *job_operation);
  gboolean
+--- a/thunar/thunar-job-operation-history.c
++++ b/thunar/thunar-job-operation-history.c
+@@ -351,26 +351,35 @@
+     {
+       gint index;
+ 
++      gboolean is_copy = thunar_job_operation_get_kind (operation_marker) == THUNAR_JOB_OPERATION_KIND_COPY;
++
+       index = 1; /* one indexed for the dialog */
+-      warning_body = g_string_new (_("The following files were overwritten in the operation "
+-                                       "you are trying to undo and cannot be restored:\n"));
++      /* short wording: a copy keeps the overwritten paths (see new_invert); for other operations the overwritten originals are gone */
++      warning_body = g_string_new (is_copy ? _("These overwritten files left intact after undo:\n")
++                                           : _("These overwritten files could not be restored:\n"));
+ 
+       for (const GList *lp = overwritten_files; lp != NULL; lp = lp->next, index++)
+         {
+-          file_uri = g_file_get_uri (lp->data);
++          file_uri = g_file_get_parse_name (lp->data);
+           g_string_append_printf (warning_body, "%d. %s\n", index, file_uri);
+           g_free (file_uri);
+         }
+ 
+-      xfce_dialog_show_warning (parent,
+-                                warning_body->str,
+-                                _("%s operation can only be partially undone"),
+-                                thunar_job_operation_get_kind_nick (operation_marker));
++      xfce_dialog_show_warning (parent, warning_body->str, _("Incomplete undo error"));
+ 
+       g_string_free (warning_body, TRUE);
+     }
+ 
+   inverted_operation = thunar_job_operation_new_invert (operation_marker);
++  if (thunar_job_operation_empty (inverted_operation))
++    {
++      /* a copy that only overwrote existing files has nothing left to remove */
++      g_object_unref (inverted_operation);
++      g_mutex_unlock (&job_operation_history->job_operation_list_mutex);
++      g_object_notify (G_OBJECT (job_operation_history), "can-undo");
++      g_object_notify (G_OBJECT (job_operation_history), "can-redo");
++      return;
++    }
+   operation_canceled = thunar_job_operation_execute (inverted_operation, &err);
+   g_object_unref (inverted_operation);
+ 
+@@ -448,20 +457,16 @@
+       gint index;
+ 
+       index = 1; /* one indexed for the dialog */
+-      warning_body = g_string_new (_("The following files were overwritten in the operation "
+-                                       "you are trying to redo and cannot be restored:\n"));
++      warning_body = g_string_new (_("These overwritten files could not be restored:\n"));
+ 
+       for (const GList *lp = overwritten_files; lp != NULL; lp = lp->next, index++)
+         {
+-          file_uri = g_file_get_uri (lp->data);
++          file_uri = g_file_get_parse_name (lp->data);
+           g_string_append_printf (warning_body, "%d. %s\n", index, file_uri);
+           g_free (file_uri);
+         }
+ 
+-      xfce_dialog_show_warning (parent,
+-                                warning_body->str,
+-                                _("%s operation can only be partially redone"),
+-                                thunar_job_operation_get_kind_nick (operation_marker));
++      xfce_dialog_show_warning (parent, warning_body->str, _("Incomplete redo error"));
+ 
+       g_string_free (warning_body, TRUE);
+     }

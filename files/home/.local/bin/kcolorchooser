@@ -1,6 +1,0 @@
-#!/bin/sh
-# kcolorchooser (Knomadic's colour picker): same Qt look as Konsole/Ark (qt-fm shim, no qt6ct). Callers that pass their own -stylesheet keep it;
-# otherwise kcolorchooser.qss (qt-general.qss + frameless swatches) is used. Real binary: /usr/bin/kcolorchooser.
-case " $* " in *" -stylesheet "*) SS= ;; *) SS="-stylesheet $HOME/.themes/qt-fm/kcolorchooser.qss" ;; esac
-exec env -u QT_QPA_PLATFORMTHEME QT_STYLE_OVERRIDE=Breeze LD_PRELOAD="$HOME/.themes/qt-fm/libqt-fm.so:$HOME/.themes/qt-noicons/libqt-noicons.so" \
-  /usr/bin/kcolorchooser $SS "$@"

@@ -1152,3 +1152,12 @@ StEntry:focus {
     background-color: st-lighten(st-lighten(st-mix(#ffffff, #4d4d51, 9%), 8%), 9%) !important;
 }
 /* END grey-shift-auto-generated */
+
+/* BEGIN shell-text-colors (set-shell-color.sh text roles; kept LAST so they win over equal-specificity rules above; do not move) */
+/* BEGIN text-calendar-dim */
+.calendar .calendar-day.calendar-other-month,
+.calendar .calendar-day.calendar-other-month.calendar-weekend {
+    color: #838396;
+}
+/* END text-calendar-dim */
+/* END shell-text-colors */

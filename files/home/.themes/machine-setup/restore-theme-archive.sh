@@ -70,8 +70,7 @@ cat <<'EOF'
 
 == Manual steps still needed (package install/removal is distro-specific, not automated here) ==
   - adw-gtk3-dark (GTK3-matches-libadwaita theme)
-  - qt5ct + qt6ct (Qt platform theme tools)
-  - A Qt style matching your GTK look (e.g. Breeze, or Fusion via qt5ct/qt6ct's own "style" setting)
+  - A Qt style matching your GTK look (e.g. Breeze or Fusion)
   - fonttools (python3-fonttools) only if you ever need to re-extract more static font weights
   - On a different architecture than the source build: cmake, g++, qt6-base-dev,
     qt6-base-private-dev, qt6-wayland-dev, qt6-svg-dev (Debian/Ubuntu names) to

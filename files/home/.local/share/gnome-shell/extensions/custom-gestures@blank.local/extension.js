@@ -1,4 +1,5 @@
 import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
@@ -6,6 +7,7 @@ import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { TouchpadGestureRouter } from './src/swipeDetector.js';
 import { DiscretePinchGesture } from './src/pinchDetector.js';
+import * as WorkspaceSwitcherPopup from 'resource:///org/gnome/shell/ui/workspaceSwitcherPopup.js';
 import * as VKeyboard from './src/keyboard.js';
 
 // Brave's Fedora RPM registers two real .desktop files that both claim the same
@@ -99,6 +101,8 @@ const FULLSCREEN_AS_MAXIMIZE_APPS = new Set([
 ]);
 
 // Apps whose split view is driven by the split-view-accelerator (middle-click / 3-finger tap, 3-finger pinch).
+// Logical px; must equal the Tiling Assistant window-gap / single-screen-gap (currently 2) times the display scale (2). Re-check by eye if either changes.
+const TILE_GAP = 4;
 const SPLIT_VIEW_APPS = new Set(['thunar.desktop', 'org.xfce.Thunar.desktop']);
 
 function getFocusedAppId() {
@@ -137,14 +141,13 @@ function handleVertical4Finger(direction) {
             // "TypeError: window.get_maximized is not a function" - it was throwing and
             // silently aborting this whole handler, including the fullscreen fallback
             // below). Boolean properties are the real API, same as already used
-            // correctly in window-gap@amirhosseinkarimi.github.io's gapManager.js.
+            // correctly elsewhere in this project.
             if (window.maximizedHorizontally && window.maximizedVertically) {
                 window.unmaximize();
             }
             else {
                 window.maximize();
                 moveToNewWorkspaceRight(window);
-                remaximizeAfterGapSettles(window);
             }
         }
         else if (window.is_fullscreen()) {
@@ -167,10 +170,80 @@ function handleVertical4Finger(direction) {
 // breaks if the user ever rebinds the underlying shortcut" trap that class of fix has hit
 // elsewhere in this project.
 function handleHorizontal4Finger(direction) {
+    switchWorkspaceWrapping(direction === 'left' ? Meta.MotionDirection.LEFT : Meta.MotionDirection.RIGHT);
+}
+
+// Infinite workspaces: past the last (or before the first) workspace, wrap to the other end. The shell's switch animation only
+// lays out the two workspaces involved side by side (index order [from,to] for RIGHT, [to,from] for LEFT), so forcing the
+// direction to the one the user swiped makes the wrap look like one more step the same way (new workspace slides in from the
+// right when going right) instead of a long scroll back across everything. wrapDirection is consumed by the animateSwitch wrapper.
+let wrapDirection = null;
+
+function switchWorkspaceWrapping(metaDirection) {
     const wsManager = global.workspace_manager;
-    const metaDirection = direction === 'left' ? Meta.MotionDirection.LEFT : Meta.MotionDirection.RIGHT;
-    const neighbor = wsManager.get_active_workspace().get_neighbor(metaDirection);
-    neighbor.activate(global.get_current_time());
+    const active = wsManager.get_active_workspace();
+    let target = active.get_neighbor(metaDirection);
+    if (target === active) {
+        const n = wsManager.get_n_workspaces();
+        if (n < 2)
+            return null;
+        target = wsManager.get_workspace_by_index(metaDirection === Meta.MotionDirection.RIGHT ? 0 : n - 1);
+        wrapDirection = metaDirection;
+    }
+    target.activate(global.get_current_time());
+    return target;
+}
+
+// Keyboard: same wrap for whatever is bound to switch-to-workspace-left/right; everything else goes to the stock handler.
+class WorkspaceWrap {
+    constructor() {
+        this._wm = Main.wm;
+        const wm = this._wm;
+        const origAnimate = wm._workspaceAnimation.animateSwitch;
+        this._origAnimate = origAnimate;
+        wm._workspaceAnimation.animateSwitch = function (from, to, direction, onComplete) {
+            if (wrapDirection !== null) {
+                direction = wrapDirection;
+                wrapDirection = null;
+            }
+            return origAnimate.call(this, from, to, direction, onComplete);
+        };
+
+        this._stock = wm._showWorkspaceSwitcher.bind(wm);
+        const mode = Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW;
+        for (const [name, dir] of [['switch-to-workspace-left', Meta.MotionDirection.LEFT],
+                                   ['switch-to-workspace-right', Meta.MotionDirection.RIGHT]]) {
+            wm.setCustomKeybindingHandler(name, mode, (display, window, event, binding) => {
+                const ws = global.workspace_manager.get_active_workspace();
+                if (ws.get_neighbor(dir) !== ws) {
+                    this._stock(display, window, event, binding);
+                    return;
+                }
+                const target = switchWorkspaceWrapping(dir);
+                if (target && !Main.overview.visible) {
+                    if (wm._workspaceSwitcherPopup == null) {
+                        wm.blockWorkspaceUpdates();
+                        wm._workspaceSwitcherPopup = new WorkspaceSwitcherPopup.WorkspaceSwitcherPopup();
+                        wm._workspaceSwitcherPopup.connect('destroy', () => {
+                            wm.unblockWorkspaceUpdates();
+                            wm._workspaceSwitcherPopup = null;
+                            wm._isWorkspacePrepended = false;
+                        });
+                    }
+                    wm._workspaceSwitcherPopup.display(target.index());
+                }
+            });
+        }
+    }
+
+    destroy() {
+        const mode = Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW;
+        for (const name of ['switch-to-workspace-left', 'switch-to-workspace-right'])
+            this._wm.setCustomKeybindingHandler(name, mode, this._stock);
+        delete this._wm._workspaceAnimation.animateSwitch;
+        wrapDirection = null;
+        this._wm = null;
+    }
 }
 
 function handleVertical3Finger(direction) {
@@ -274,29 +347,6 @@ function moveToNewWorkspaceRight(window) {
     }
 }
 
-// window-gap@amirhosseinkarimi.github.io removes its screen-edge gap struts reactively,
-// once it notices a window is maximized - but window.maximize() itself sizes the window
-// against whatever work area exists AT THAT INSTANT, which still has the strut in it (the
-// strut hasn't been removed yet at that point - window-gap hasn't reacted yet). Once it
-// does react and the strut disappears, nothing re-triggers the now-already-maximized
-// window to grow into the newly-available space. Confirmed live two ways: window-gap's
-// own debug logging proved its skip-gap logic was correct but the window still looked
-// gapped regardless, AND the user found that double-clicking the titlebar (native
-// unmaximize->maximize toggle) fixes it instantly - meaning simply calling maximize()
-// again on an ALREADY-maximized window is a no-op (Mutter has nothing to recompute if it
-// thinks the state isn't changing). Forcing a real unmaximize->maximize transition
-// instead, after window-gap's own retry (150ms) should have settled, gets the same effect
-// as the manual double-click fix.
-function remaximizeAfterGapSettles(window) {
-    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => {
-        if (window.maximizedHorizontally && window.maximizedVertically) {
-            window.unmaximize();
-            window.maximize();
-        }
-        return GLib.SOURCE_REMOVE;
-    });
-}
-
 // Every new Brave top-level window opens maximized on its own fresh workspace, activated
 // and focused. Works alongside WorkspaceCompactor below (org.gnome.mutter
 // dynamic-workspaces=false, fixed count) rather than relying on dynamic-workspace
@@ -309,7 +359,6 @@ function isBraveWindow(window) {
 function openBraveInNewWorkspace(window) {
     window.maximize();
     moveToNewWorkspaceRight(window);
-    remaximizeAfterGapSettles(window);
 }
 
 class BraveNewWorkspaceHandler {
@@ -445,6 +494,226 @@ class NoTileBounce {
     }
 }
 
+// Sloppy focus + Wayland drag and drop: after a drop onto another window, mutter never sends the pointer-enter for the target during the
+// drag, so keyboard focus stays on the drag source. When a DND selection ends (owner-changed with no source), focus the normal window
+// under the pointer shortly after (twice, the first attempt can lose to the drop handling). Skipped in click-to-focus mode, in the
+// overview/modal state, and when the focused window is a dialog of the window under the pointer.
+class DragFocusFix {
+    constructor() {
+        this._ids = [];
+        this._sel = global.display.get_selection();
+        this._selId = this._sel.connect('owner-changed', (_sel, type, source) => {
+            if (type !== Meta.SelectionType.SELECTION_DND || source)
+                return;
+            for (const ms of [150, 500]) {
+                const id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
+                    this._ids = this._ids.filter(i => i !== id);
+                    this._focusUnderPointer();
+                    return GLib.SOURCE_REMOVE;
+                });
+                this._ids.push(id);
+            }
+        });
+    }
+
+    _focusUnderPointer() {
+        const mode = new Gio.Settings({ schema_id: 'org.gnome.desktop.wm.preferences' }).get_string('focus-mode');
+        if (mode === 'click' || Main.overview.visible || Main.modalCount > 0)
+            return;
+        const [x, y] = global.get_pointer();
+        const ws = global.workspace_manager.get_active_workspace();
+        const actors = global.get_window_actors();
+        for (let i = actors.length - 1; i >= 0; i--) {
+            const win = actors[i].meta_window;
+            if (!win || win.minimized || win.get_workspace() !== ws)
+                continue;
+            const r = win.get_frame_rect();
+            if (x < r.x || y < r.y || x >= r.x + r.width || y >= r.y + r.height)
+                continue;
+            if (win.window_type !== Meta.WindowType.NORMAL)
+                return;
+            const cur = global.display.focus_window;
+            if (cur === win)
+                return;
+            if (cur && cur.get_transient_for && cur.get_transient_for() === win)
+                return;
+            win.focus(global.get_current_time());
+            return;
+        }
+    }
+
+    destroy() {
+        if (this._selId)
+            this._sel.disconnect(this._selId);
+        this._selId = 0;
+        this._sel = null;
+        for (const id of this._ids)
+            GLib.source_remove(id);
+        this._ids = [];
+    }
+}
+
+// Remembers the frame rect (position + size) of the apps in WINDOW_MEMORY_APPS and puts the window back there when it maps (Wayland clients cannot place
+// themselves). State: ~/.config/fm-tweaks/window-memory.json {app_id: [x, y, w, h]}; saved 600 ms after the last move/resize and when the window closes.
+// Maximized / fullscreen windows are not saved.
+const WINDOW_MEMORY_APPS = ['art.fatdawlf.Piccolo'];
+const WINDOW_MEMORY_FILE = GLib.build_filenamev([GLib.get_user_config_dir(), 'fm-tweaks', 'window-memory.json']);
+
+class WindowMemory {
+    constructor() {
+        this._state = {};
+        try {
+            const [ok, bytes] = GLib.file_get_contents(WINDOW_MEMORY_FILE);
+            if (ok) this._state = JSON.parse(new TextDecoder().decode(bytes));
+        } catch (e) { /* no state yet */ }
+        this._timers = new Map();
+        this._mapId = global.window_manager.connect('map', (_wm, actor) => this._onMap(actor.meta_window));
+    }
+
+    _appId(win) {
+        const id = win.get_gtk_application_id?.() || win.get_wm_class?.() || '';
+        return WINDOW_MEMORY_APPS.find(a => id === a || id === a + '.desktop') ?? null;
+    }
+
+    _save() {
+        try {
+            GLib.mkdir_with_parents(GLib.path_get_dirname(WINDOW_MEMORY_FILE), 0o755);
+            GLib.file_set_contents(WINDOW_MEMORY_FILE, JSON.stringify(this._state));
+        } catch (e) { /* ignore */ }
+    }
+
+    _remember(win, app) {
+        if (win.is_fullscreen() || win.is_maximized?.() || win.maximized_horizontally || win.maximized_vertically) return;   // GNOME 50 has no get_maximized()
+        const r = win.get_frame_rect();
+        this._state[app] = [r.x, r.y, r.width, r.height];
+        this._save();
+    }
+
+    _onMap(win) {
+        const app = win && win.window_type === Meta.WindowType.NORMAL ? this._appId(win) : null;
+        if (win && win.window_type === Meta.WindowType.NORMAL)
+            console.log(`WindowMemory: mapped app_id=${win.get_gtk_application_id?.()} wm_class=${win.get_wm_class?.()} -> ${app ?? 'not remembered'}`);
+        if (!app) return;
+        const saved = this._state[app];
+        if (saved)
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 60, () => {
+                try { win.move_resize_frame(false, saved[0], saved[1], saved[2], saved[3]); } catch (e) { /* window gone */ }
+                return GLib.SOURCE_REMOVE;
+            });
+        const queue = () => {
+            const old = this._timers.get(win);
+            if (old) GLib.source_remove(old);
+            this._timers.set(win, GLib.timeout_add(GLib.PRIORITY_DEFAULT, 600, () => {
+                this._timers.delete(win);
+                this._remember(win, app);
+                return GLib.SOURCE_REMOVE;
+            }));
+        };
+        // only start saving once the restore has happened, so the initial default-size map does not overwrite the saved rect
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 400, () => {
+            win._wmIds = [win.connect('position-changed', queue), win.connect('size-changed', queue)];
+            win.connect('unmanaging', () => {
+                const t = this._timers.get(win);
+                if (t) { GLib.source_remove(t); this._timers.delete(win); }
+                this._remember(win, app);
+            });
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    destroy() {
+        if (this._mapId) global.window_manager.disconnect(this._mapId);
+        this._mapId = 0;
+        for (const t of this._timers.values()) GLib.source_remove(t);
+        this._timers.clear();
+    }
+}
+
+// 2026-10-25: Thunar windows open tiled LEFT through Tiling Assistant (same key as the 3-finger swipe), so they get its gaps. Added after the strut gap was removed:
+// the old struts made Thunar's remembered ~half-screen size look tiled; now it needs a real tile. Skipped if the window is already tiled/maximized
+// or not focused when the timer fires (the key goes to the focused window). To undo: remove ThunarTileLeft + its two lines in enable()/disable().
+class ThunarTileLeft {
+
+    constructor() {
+        this._handlerId = global.display.connect('window-created', (_d, window) => {
+            if (window.get_window_type() !== Meta.WindowType.NORMAL)
+                return;
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 500, () => {
+                this._tile(window);
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+    }
+
+    _tile(window) {
+        if (!window.get_compositor_private() || !window.has_focus())
+            return;
+        const app = Shell.WindowTracker.get_default().get_window_app(window);
+        if (!app || !SPLIT_VIEW_APPS.has(app.get_id()))
+            return;
+        if (window.maximizedHorizontally || window.maximizedVertically || window.tiledRect)
+            return;
+        // 2026-10-26 (Debian hand-back): only the first Thunar window, never dialogs (the copy-progress dialog is a NORMAL window too), and place the
+        // window directly instead of typing the tile key (the chord broke XWayland drag & drop). GAP = TA gap as drawn in logical px (setting 2 x scale 2).
+        if (window.get_transient_for())
+            return;
+        const sameApp = global.get_window_actors().map(a => a.meta_window).filter(w =>
+            w !== window && w.get_window_type() === Meta.WindowType.NORMAL &&
+            Shell.WindowTracker.get_default().get_window_app(w) === app);
+        if (sameApp.length)
+            return;
+        const GAP = TILE_GAP;
+        const wa = window.get_work_area_current_monitor();
+        window.move_resize_frame(false, wa.x + GAP, wa.y + GAP, Math.floor((wa.width - 3 * GAP) / 2), wa.height - 2 * GAP);
+    }
+
+    destroy() {
+        if (this._handlerId) {
+            global.display.disconnect(this._handlerId);
+            this._handlerId = 0;
+        }
+    }
+
+}
+
+// 2026-10-26: SMPlayer (XWayland) opens tiled RIGHT by direct placement. The old ydotool tile-right chord from ~/.local/bin/smplayer left the
+// XWayland client half-active (dead shortcuts, stuck traffic lights, ignored drops). Same placement maths as ThunarTileLeft, mirrored.
+class SMPlayerTileRight {
+
+    constructor() {
+        this._handlerId = global.display.connect('window-created', (_d, window) => {
+            if (window.get_window_type() !== Meta.WindowType.NORMAL)
+                return;
+            if (!(window.get_wm_class() ?? '').toLowerCase().includes('smplayer'))
+                return;
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 700, () => {
+                this._tile(window);
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+    }
+
+    _tile(window) {
+        if (!window.get_compositor_private() || window.get_transient_for())
+            return;
+        if (window.maximizedHorizontally || window.maximizedVertically || window.tiledRect)
+            return;
+        window.activate(global.get_current_time());
+        const GAP = TILE_GAP;
+        const wa = window.get_work_area_current_monitor();
+        const w = Math.floor((wa.width - 3 * GAP) / 2);
+        window.move_resize_frame(false, wa.x + 2 * GAP + w, wa.y + GAP, wa.width - 3 * GAP - w, wa.height - 2 * GAP);
+    }
+
+    destroy() {
+        if (this._handlerId) {
+            global.display.disconnect(this._handlerId);
+            this._handlerId = 0;
+        }
+    }
+
+}
+
 export default class CustomGesturesExtension extends Extension {
 
     enable() {
@@ -460,6 +729,11 @@ export default class CustomGesturesExtension extends Extension {
         this._braveNewWorkspace = new BraveNewWorkspaceHandler();
         this._workspaceCompactor = new WorkspaceCompactor();
         this._noTileBounce = new NoTileBounce();
+        this._workspaceWrap = new WorkspaceWrap();
+        this._dragFocusFix = new DragFocusFix();
+        this._windowMemory = new WindowMemory();
+        this._thunarTileLeft = new ThunarTileLeft();
+        this._smplayerTileRight = new SMPlayerTileRight();
     }
 
     disable() {
@@ -475,6 +749,16 @@ export default class CustomGesturesExtension extends Extension {
         this._workspaceCompactor = undefined;
         this._noTileBounce?.destroy();
         this._noTileBounce = undefined;
+        this._workspaceWrap?.destroy();
+        this._workspaceWrap = undefined;
+        this._windowMemory?.destroy();
+        this._windowMemory = undefined;
+        this._dragFocusFix?.destroy();
+        this._dragFocusFix = undefined;
+        this._thunarTileLeft?.destroy();
+        this._thunarTileLeft = undefined;
+        this._smplayerTileRight?.destroy();
+        this._smplayerTileRight = undefined;
         VKeyboard.cleanup();
         settings = null;
     }

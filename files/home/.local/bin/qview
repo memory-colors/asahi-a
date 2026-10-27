@@ -1,4 +1,4 @@
 #!/bin/sh
-# qView: same Qt look as Konsole/Ark/kcolorchooser (qt-fm shim + qt-general.qss, no qt6ct). Real binary: /usr/bin/qview.
-exec env -u QT_QPA_PLATFORMTHEME QT_STYLE_OVERRIDE=Breeze LD_PRELOAD="$HOME/.themes/qt-fm/libqt-fm.so:$HOME/.themes/qt-noicons/libqt-noicons.so" \
+# qView: same Qt look as SMPlayer (qt-fm shim + qt-general.qss). Real binary: /usr/bin/qview.
+exec env QT_STYLE_OVERRIDE=Fusion LD_PRELOAD="$HOME/.themes/qt-fm/libqt-fm.so:$HOME/.themes/qt-noicons/libqt-noicons.so" \
   /usr/bin/qview -stylesheet "$HOME/.themes/qt-fm/qt-general.qss" "$@"

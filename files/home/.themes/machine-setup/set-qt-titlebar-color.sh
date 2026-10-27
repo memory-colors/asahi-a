@@ -1,5 +1,5 @@
 #!/bin/bash
-# set-qt-titlebar-color.sh (Knomadic: Qt Apps > Titlebar) - titlebar of the NATIVE-WAYLAND Qt windows only (Konsole, Ark...: the Qt Wayland decoration
+# set-qt-titlebar-color.sh (Knomadic: Qt Apps > Titlebar) - titlebar of the NATIVE-WAYLAND Qt windows only (Ark...: the Qt Wayland decoration
 # plugin). It does NOT colour Thunar (fm-tweaks `titlebar`), SMPlayer / any X11 window (set-gtk-titlebar-color.sh x11), GTK4 apps (set-gtk-titlebar-color.sh gtk)
 # or Text Editor (set-text-editor-titlebar-color.sh). Original header follows.
 #
@@ -7,15 +7,13 @@
 # background color, touching ONLY ~/.config/qwhitesurgtkdecorations.conf's
 # BackgroundColor key.
 #
-# Split out from set-dark-background.sh (which used to also own this
-# file) per the user's standing preference: the Qt titlebar tracks its OWN
-# role, independent of the general dark background role.
+# The Qt titlebar tracks its OWN role (it used to share the retired dark-background script).
 #
 # *** Do not confuse this with GTK's headerbar_bg_color token in gtk.css ***
 # headerbar_bg_color (and its mix()-derived variants) is the libadwaita
 # split-pane sidebar/header color used by apps like Settings/Tweaks - a
 # DIFFERENT visual role from the singular top titlebar. The actual titlebar
-# seen on native-Wayland Qt apps (Konsole, Ark...) is drawn entirely by this decoration
+# seen on native-Wayland Qt apps (Ark...) is drawn entirely by this decoration
 # config overlay. Never move headerbar_bg_color into this script.
 #
 # Usage: ./set-qt-titlebar-color.sh <new-hex-color>
@@ -69,4 +67,4 @@ sed -i "s/BackgroundColor=#${OLD_HEX}/BackgroundColor=#${NEW_HEX}/I" "$DECO_CONF
 echo "Titlebar: #$OLD_HEX -> #$NEW_HEX"
 echo "  updated: $DECO_CONF"
 echo
-echo "Done. Restart Qt apps (Konsole, Ark) to see the change."
+echo "Done. Restart Qt apps (Ark) to see the change."

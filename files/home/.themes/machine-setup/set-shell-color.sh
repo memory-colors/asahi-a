@@ -29,6 +29,11 @@
 #   calendar-background  - #calendarArea / .datemenu-popover bg
 #   calendar-banners     - date header, "Today/No Events", "Add World Clocks..." and weather boxes
 #   calendar-buttons     - day-number pills in the calendar grid
+#   topbar-text          - top bar text AND icons (+ the clock): edits the "Panel text" and "#panel .clock" rules in place
+#   qs-text              - Quick Settings text, icons and slider handles (switched-on toggles keep the accent foreground)
+#   calendar-text        - calendar day numbers, weekday letters, month label, prev/next arrows and the banner text (today/clocks/events/weather)
+#   calendar-dim         - calendar days of the previous/next month ("inactive" days)
+#   (qs-text, calendar-text, calendar-dim live in marked sub-blocks at the END of the css, written by _shell_text.py)
 #   calendar-headers     - month label, prev/next arrows, weekday letters (marked block)
 #
 # Usage: ./set-shell-color.sh <role> <new-hex-color>
@@ -48,6 +53,10 @@ declare -A ANCHORS=(
     [qs-inactive]="BLOCK:qs-inactive-toggle"
     [calendar-headers]="BLOCK:calendar-headers"
     [calendar-buttons]=".calendar .calendar-day {"
+    [topbar-text]="#panel .panel-button,\n#panel .panel-button *|#panel .clock {"
+    [qs-text]="TEXT:qs-text"
+    [calendar-text]="TEXT:calendar-text"
+    [calendar-dim]="TEXT:calendar-dim"
 )
 
 if [ $# -lt 1 ]; then
@@ -60,6 +69,14 @@ ROLE="$1"
 if [ -z "${ANCHORS[$ROLE]+x}" ]; then
     echo "Error: unknown role '$ROLE'. Valid roles: ${!ANCHORS[@]}" >&2
     exit 1
+fi
+
+if [[ "${ANCHORS[$ROLE]}" == TEXT:* ]]; then
+    [ $# -eq 2 ] || { echo "Usage: $0 <role> <new-hex-color> | --get"; exit 1; }
+    [ -f "$CSS" ] || { echo "Error: $CSS not found - is this the right machine?" >&2; exit 1; }
+    python3 "$(dirname "$(readlink -f "$0")")/_shell_text.py" "$CSS" "$ROLE" "$2"
+    [ "$2" == "--get" ] || { echo; echo "Done. Log out and back in to apply shell theme changes."; }
+    exit 0
 fi
 
 if [ "${2:-}" == "--get" ]; then
@@ -105,8 +122,6 @@ if [ ! -f "$CSS" ]; then
     exit 1
 fi
 
-BACKUP_SUFFIX=".bak-pre-${ROLE}-${NEW_HEX}"
-cp "$CSS" "${CSS}${BACKUP_SUFFIX}"
 
 python3 - "$CSS" "${ANCHORS[$ROLE]}" "$NEW_HEX" "$ROLE" <<'PYEOF'
 import re, sys

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-fm-tweaks - one config, one generator for the personal file-manager / Qt look: Thunar, SMPlayer, Konsole/Ark/kcolorchooser.
+fm-tweaks - one config, one generator for the personal file-manager / Qt look: Thunar and the wrapped Qt apps (qView, SMPlayer).
 
   conf      ~/.config/fm-tweaks/fm-tweaks.conf   (the ONLY file you edit; `init` writes it from the defaults below)
   templates <repo>/templates/*.in                           ({{token}} placeholders; human-readable, hand-edited)
   outputs   (GENERATED, never hand-edited; changed files only are rewritten): the Thunar css (~/.themes/fm-sample), the general Qt look for the wrapped
-            apps (~/.themes/qt-fm/{qt-general,kcolorchooser}.qss, ~/.config/fm-tweaks/qt-theme.conf, bluegrey.colors + the [Colors:*] blocks of kdeglobals)
+            apps (~/.themes/qt-fm/qt-general.qss, ~/.config/fm-tweaks/qt-theme.conf)
             and SMPlayer's own palette (qt-theme-smplayer.conf + style.qss from the sm* keys). See README.md.
 
 Commands:
@@ -25,16 +25,13 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 ROOT = os.path.dirname(HERE)
 TEMPLATES = os.path.join(ROOT, 'templates')
 CONF = os.environ.get('FM_TWEAKS_CONF') or os.path.join(HOME, '.config/fm-tweaks/fm-tweaks.conf')
-QT_QSS = os.environ.get('FM_TWEAKS_QT_QSS') or os.path.join(HOME, '.themes/qt-fm/qt-general.qss')   # rounded menus/tooltips for every wrapped Qt app (~/.local/bin/konsole, ark: -stylesheet)
-KCOLOR_QSS = os.environ.get('FM_TWEAKS_KCOLOR_QSS') or os.path.join(HOME, '.themes/qt-fm/kcolorchooser.qss')   # qt-general.qss + frameless colour swatches; Knomadic passes it to kcolorchooser
-KDE_SCHEME = os.environ.get('FM_TWEAKS_KDE_SCHEME') or os.path.join(HOME, '.local/share/color-schemes/bluegrey.colors')   # KColorScheme Konsole reads (toolbar, menu text)
-KDEGLOBALS = os.environ.get('FM_TWEAKS_KDEGLOBALS') or os.path.join(HOME, '.config/kdeglobals')   # only its [Colors:*] blocks are rewritten
+QT_QSS = os.environ.get('FM_TWEAKS_QT_QSS') or os.path.join(HOME, '.themes/qt-fm/qt-general.qss')   # rounded menus/tooltips for every wrapped Qt app (SMPlayer, qView)
 SMPLAYER_QSS = os.environ.get('FM_TWEAKS_SMPLAYER_QSS') or os.path.join(HOME, '.config/smplayer/themes/PapirusDark/style.qss')   # SMPlayer loads ITS app stylesheet from here (not from -stylesheet); shared menu/tooltip rules only
 SMPLAYER_RCC_SRC = next((p for p in (os.path.join(HOME, '.local/opt/smplayer-qt6/share/smplayer/themes/PapirusDark/PapirusDark.rcc'), '/usr/share/smplayer/themes/PapirusDark/PapirusDark.rcc') if os.path.exists(p)), '')   # icon bundle (Asahi private prefix, else the Debian package dir)
-QT_THEME = os.environ.get('FM_TWEAKS_QT_THEME') or os.path.join(HOME, '.config/fm-tweaks/qt-theme.conf')   # read by the qt-fm shim (replaces qt6ct) for every wrapped Qt app: palette + font + icon theme
+QT_THEME = os.environ.get('FM_TWEAKS_QT_THEME') or os.path.join(HOME, '.config/fm-tweaks/qt-theme.conf')   # read by the qt-fm shim for every wrapped Qt app: palette + font + icon theme
 QT_THEME_SM = os.environ.get('FM_TWEAKS_QT_THEME_SM') or os.path.join(HOME, '.config/fm-tweaks/qt-theme-smplayer.conf')   # SMPlayer's own (darker) palette; its wrapper sets FM_QT_THEME to this
-QT_FONT, QT_ICON_THEME = 'SF Pro Regular,14', 'MacTahoe-nord-dark'  # 14 = what qt6ct used for the wrapped Qt apps
-SMPLAYER_MENU_RADIUS = (16, 8)   # menu, highlighted item (px): SMPlayer runs scaled 0.8 (hdpi.ini), so a bit bigger than the shared 10/5
+QT_FONT, QT_ICON_THEME = 'SF Pro Regular,14', 'MacTahoe-nord-dark'  # 14 = point size for the wrapped Qt apps
+ICON_DIR = os.environ.get('FM_TWEAKS_ICON_DIR') or os.path.join(HOME, '.local/share/icons')   # where bin/round-folder-icons put the folder icons (fm-folders/ + the MacTahoe-nord-dark overlay)
 THUNAR_OUT = os.environ.get('FM_TWEAKS_THUNAR_OUT') or os.path.join(HOME, '.themes/fm-sample')   # the Thunar/GTK3 trial theme (thunar-fm)
 
 # ---------------------------------------------------------------- the key table: the single place that knows every setting
@@ -49,11 +46,15 @@ KEYS = [
     ('overrides', 'button',   '',       'color?', 'column-header (Name/Size) bar, push buttons + the Qt button swatch (empty = view shifted by D_BUTTON); the Thunar titlebar has its own key `titlebar`'),
     ('overrides', 'titlebar', '',      'color?', 'Thunar titlebar (empty = follow button)'),
     ('overrides', 'sidebarhl', '',      'color?', 'selected row in the Places sidebar - Thunar only (empty = follow accent)'),
+    ('overrides', 'foldercolor', 'e4e4e4', 'color', 'folder icons (Thunar and every GTK app on the fm-folders icon theme): colour of the front panel; the back layer is 24 darker and the paper 27 lighter'),
+    ('overrides', 'menubar', '',     'color?', 'Thunar menu bar background (empty = follow the Menu/tooltip colour); its text follows statustext'),
+    ('overrides', 'rowhover', '',       'color?', 'Thunar hovered row (file list only) fill (empty = the accent at 50% over what is behind)'),
     ('text', 'text',          'deddda', 'color',  'general text: file names + details, Qt app text'),
     ('text', 'sidebartext',   'dcdcdc', 'color',  'Places panel text'),
     ('text', 'buttontext',    'dcdcdc', 'color',  'column-header row + menu item text'),
     ('text', 'statustext',    'dcdcdc', 'color',  'status bar labels (message, item count, zoom, progress)'),
     ('text', 'hltext',        'ffffff', 'color',  'text on highlighted (selected / hovered menu) rows - Thunar only'),
+    ('overrides', 'headertext', '',    'color?', 'Thunar column-header text (Name / Size / Date row) (empty = follow text)'),
     ('smplayer', 'menubar_hidden', 'true', 'bool', 'SMPlayer: hide the menu bar until the toggle key is pressed'),
     ('smplayer', 'menubar_key', 'Ctrl+M', 'text', 'SMPlayer: key that shows/hides the menu bar (free it in SMPlayer first; empty = none)'),
     ('smplayer', 'hide_dock_titles', 'true', 'bool', 'SMPlayer: hide the "Untitled playlist" title strip above the playlist'),
@@ -69,6 +70,19 @@ KEYS = [
     ('smplayer', 'smtext',    '', 'color?', 'SMPlayer text, incl. buttons and menu items (empty = follow text)'),
     ('smplayer', 'smstatustext', '', 'color?', 'SMPlayer status bar text (empty = follow statustext)'),
     ('smplayer', 'smhltext',  '', 'color?', 'SMPlayer text on highlighted rows (empty = follow hltext)'),
+    ('smplayer', 'smheadertext', '', 'color?', 'SMPlayer table / column-header text (empty = follow smtext, else buttontext)'),
+    ('smplayer', 'smplaylisttext', '', 'color?', 'SMPlayer playlist track names (empty = follow smtext)'),
+    ('smplayer', 'smcontrol', '', 'color?', 'SMPlayer main control bar background (empty = follow smpanel)'),
+    ('smplayer', 'smcontrolknob', '', 'color?', 'SMPlayer main control bar slider knobs (empty = follow smtext)'),
+    ('smplayer', 'smfloat',   '', 'color?', 'SMPlayer floating control bar background (empty = follow smpanel)'),
+    ('smplayer', 'smfloattext', '', 'color?', 'SMPlayer floating control bar text (empty = follow smtext)'),
+    ('smplayer', 'smfloatknob', '', 'color?', 'SMPlayer floating control bar slider knobs (empty = follow smtext)'),
+    ('smplayer', 'smmenuhltext', '', 'color?', 'SMPlayer text on the highlighted menu item (empty = follow smhltext)'),
+    ('smplayer', 'smmenuborder', '', 'color?', 'SMPlayer menu outline (empty = 45454d)'),
+    ('smplayer', 'smborder', '', 'color?', 'SMPlayer tab pane / group box / combo popup / tooltip outlines (empty = menu colour + D_TIPBORDER)'),
+    ('smplayer', 'smdisabled', '', 'color?', 'SMPlayer greyed-out text (empty = smtext minus 70)'),
+    ('smplayer', 'smcontrolicon', '', 'color?', 'SMPlayer main control bar icons (empty = icons stay as shipped)'),
+    ('smplayer', 'smfloaticon', '', 'color?', 'SMPlayer floating control bar icons (empty = icons stay as shipped)'),
     ('thunar', 'inactivetext', '0.53',  'float',  'Thunar: opacity of the inactive split pane (lower = dimmer)'),
 ]
 BYKEY = {k[1]: k for k in KEYS}
@@ -116,16 +130,28 @@ def read_conf():
                 vals[m.group(1)] = parse_value(m.group(1), m.group(2)) if m.group(2).strip() else (vals[m.group(1)] if BYKEY[m.group(1)][3] != 'color?' else '')
     return vals
 
-SM_FOLLOW = {'smmenu': 'tooltip', 'smpanel': 'window', 'smcontent': 'view', 'smfield': 'button', 'smaccent': 'accent', 'smstatus': 'statusbar', 'smtext': 'text', 'smstatustext': 'statustext', 'smhltext': 'hltext'}
+SM_FOLLOW = {'smmenu': 'tooltip', 'smpanel': 'window', 'smcontent': 'view', 'smfield': 'button', 'smaccent': 'accent', 'smstatus': 'statusbar', 'smtext': 'text', 'smstatustext': 'statustext', 'smhltext': 'hltext',
+             'smplaylisttext': 'smtext', 'smcontrol': 'smpanel', 'smcontrolknob': 'smtext', 'smfloat': 'smpanel', 'smfloattext': 'smtext', 'smfloatknob': 'smtext', 'smmenuhltext': 'smhltext'}
 
 def effective(v):
     e = dict(v)
     e['statusbar'] = v['statusbar'] or v['view']
     e['button'] = v['button'] or shift(v['view'], D_BUTTON)
     e['sidebarhl'] = v['sidebarhl'] or v['accent']
+    e['rowhovercss'] = ('#' + v['rowhover']) if v['rowhover'] else 'alpha(#%s, 0.5)' % v['accent']   # what the CSS gets: a solid colour, or the translucent accent (unchanged look)
+    e['rowhover'] = v['rowhover'] or ''.join('%02x' % ((int(v['accent'][i:i + 2], 16) + int(v['view'][i:i + 2], 16)) // 2) for i in (0, 2, 4))   # `get` shows the colour as seen on the view: the 50% mix
     e['titlebar'] = v['titlebar'] or e['button']
+    e['menubar'] = v['menubar'] or v['tooltip']
+    e['headertext'] = v['headertext'] or v['text']
+    e['smheadertext'] = v['smheadertext'] or v['smtext'] or v['buttontext']   # = what SMPlayer's headers used before they had their own swatch
     for k, follow in SM_FOLLOW.items():
         e[k] = v[k] or e[follow]
+    e['smmenuborder'] = v['smmenuborder'] or '45454d'
+    e['smborder'] = v['smborder'] or shift(e['smmenu'], D_TIPBORDER)
+    e['smdisabled'] = v['smdisabled'] or shift(e['smtext'], (-70, -70, -70))
+    # the generic names the shared templates use; sm_view swaps them for the sm* keys above
+    e.update(playlisttext=e['text'], controlbg=e['window'], controlknob=e['text'], floatbg=e['window'], floattext=e['text'], floatknob=e['text'],
+             menuhltext='ffffff', menuborder='45454d', borderc=shift(e['tooltip'], D_TIPBORDER), disabledc=shift(e['text'], (-70, -70, -70)))
     return e
 
 def write_conf_keys(changes):
@@ -173,57 +199,31 @@ def atomic_write(path, text):
 
 def tokens(e):
     v = e['view']
-    t = {k: '#' + e[k] for k in ('sidebar', 'view', 'accent', 'window', 'tooltip', 'statusbar',
-                                 'text', 'sidebartext', 'buttontext', 'statustext', 'button', 'sidebarhl', 'hltext', 'titlebar')}
+    t = {k: '#' + e[k] for k in ('sidebar', 'view', 'accent', 'window', 'tooltip', 'menubar', 'statusbar',
+                                 'text', 'sidebartext', 'buttontext', 'statustext', 'button', 'sidebarhl', 'hltext', 'titlebar', 'headertext',
+                                 'playlisttext', 'controlbg', 'controlknob', 'floatbg', 'floattext', 'floatknob', 'menuhltext', 'menuborder')}
     t['inactivetext'] = e['inactivetext']
+    t['rowhover'] = e['rowhovercss']
     # Thunar paints the file-view selection as accent_bg_color at 50% alpha over the view colour: accent_paint = 2*accent - view (clamped), so it lands on the swatch
     t['accent_paint'] = '#' + ''.join('%02x' % max(0, min(255, 2 * int(e['accent'][i:i + 2], 16) - int(e['view'][i:i + 2], 16))) for i in (0, 2, 4))
     t['divider'] = '#' + shift(v, D_DIVIDER)
     t['accent_hover'] = '#' + shift(e['accent'], D_ACCENT_HOVER)
-    t['tipborder'] = '#' + shift(e['tooltip'], D_TIPBORDER)
+    t['tipborder'] = '#' + e['borderc']
     for k in ('view', 'window', 'accent', 'text', 'buttontext'):
         t[k + '_dec'] = dec(e[k])
     t['button_dec'] = dec(e['button'])
     t['asset_dir'] = os.path.dirname(SMPLAYER_QSS)
-    t['text_dim'] = '#' + shift(e['text'], (-70, -70, -70))
+    t['text_dim'] = '#' + e['disabledc']
     return t
 
 def sm_view(e, v):
     """the colour set SMPlayer is rendered from: every swatch the shared SMPlayer templates use is replaced by its own sm* key (which follows the main one until set)"""
     s = dict(e)
     s.update(tooltip=e['smmenu'], window=e['smpanel'], view=e['smcontent'], button=e['smfield'], accent=e['smaccent'], statusbar=e['smstatus'],
-             text=e['smtext'], buttontext=v['smtext'] or e['buttontext'], statustext=e['smstatustext'], hltext=e['smhltext'])
+             text=e['smtext'], buttontext=v['smtext'] or e['buttontext'], statustext=e['smstatustext'], hltext=e['smhltext'], headertext=e['smheadertext'],
+             playlisttext=e['smplaylisttext'], controlbg=e['smcontrol'], controlknob=e['smcontrolknob'], floatbg=e['smfloat'], floattext=e['smfloattext'],
+             floatknob=e['smfloatknob'], menuhltext=e['smmenuhltext'], menuborder=e['smmenuborder'], borderc=e['smborder'], disabledc=e['smdisabled'])
     return s
-
-KDE_SETS = (('Window', 'window', 'text'), ('View', 'view', 'text'), ('Selection', 'accent', 'hltext'), ('Button', 'button', 'buttontext'), ('Tooltip', 'tooltip', 'text'))
-
-def kde_block(name, bg, fg, accent):
-    rgb = lambda h: dec(h)
-    rows = [('BackgroundAlternate', rgb(bg)), ('BackgroundNormal', rgb(bg)), ('DecorationFocus', rgb(accent)), ('DecorationHover', rgb(shift(bg, (10, 10, 12)))),
-            ('ForegroundActive', rgb(fg)), ('ForegroundInactive', rgb(fg)), ('ForegroundLink', rgb(fg)), ('ForegroundNegative', '130,12,16'), ('ForegroundNeutral', rgb(fg)),
-            ('ForegroundNormal', rgb(fg)), ('ForegroundPositive', rgb(fg)), ('ForegroundVisited', rgb(fg))]
-    return '[Colors:%s]\n' % name + ''.join('%s=%s\n' % kv for kv in rows) + '\n'
-
-def kde_colors(e):
-    return ''.join(kde_block(n, e[bg], e[fg], e['accent']) for n, bg, fg in KDE_SETS)
-
-def kde_scheme(e):
-    """bluegrey.colors: a complete KColorScheme file (Konsole's toolbar + menu text read it)"""
-    return kde_colors(e) + '[ColorEffects:Inactive]\nChangeSelectionColor=false\nColor=%s\nColorAmount=0\nColorEffect=0\nContrastAmount=0\nContrastEffect=0\nIntensityAmount=0\nIntensityEffect=0\n\n[Icons]\nTheme=%s\n\n[General]\nColorScheme=bluegrey\nName=bluegrey\nshadeSortColumn=false\n' % (dec(e['window']), QT_ICON_THEME)
-
-def kdeglobals_text(e, old):
-    """kdeglobals: only the [Colors:<set>] blocks of the five sets are replaced (anchored); every other key stays as it is"""
-    out = old
-    for n, bg, fg in KDE_SETS:
-        blk = kde_block(n, e[bg], e[fg], e['accent'])
-        pat = r'(?ms)^\[Colors:%s\][ \t]*\n.*?(?=^\[|\Z)' % n
-        out = re.sub(pat, lambda m: blk, out, count=1) if re.search(pat, out) else out.rstrip('\n') + '\n\n' + blk
-    return out
-
-KCOLOR_EXTRA = """
-/* kcolorchooser: no 1px frames around the preview swatch and the colour pickers, so colours can be compared */
-QColorDialog QFrame, QColorShowLabel, QColorPicker, QColorLuminancePicker { border: none; border-width: 0px; }
-"""
 
 def qt_svgs(e):
     """tiny glyphs the SMPlayer stylesheet needs (QSS can't draw arrows / check marks): coloured from the swatches"""
@@ -235,7 +235,7 @@ def qt_svgs(e):
             'radio.svg': head + '<circle cx="8" cy="8" r="3" fill="%s"/></svg>' % hl}
 
 def qt_theme_conf(e, t, font=None):
-    """palette for the qt-fm shim, role order = QPalette::ColorRole 0..21 (same order qt6ct used)"""
+    """palette for the qt-fm shim, role order = QPalette::ColorRole 0..21"""
     a = lambda h, al='ff': '#' + al + h.lstrip('#')
     w, text = e['window'], e['text']
     def roles(dis):
@@ -243,7 +243,7 @@ def qt_theme_conf(e, t, font=None):
         return [tx(text), a(e['button']), a(shift(w, (40, 40, 44))), a(shift(w, (20, 20, 22))), a(shift(w, (-22, -22, -24))), a(shift(w, (-12, -12, -13))), tx(text), a('ffffff'), tx(e['buttontext']),
                 a(e['view']), a(w), a('000000'), a(e['accent']), a(e['hltext']), a(shift(e['accent'], (60, 60, 70))), a(shift(e['accent'], (30, 20, 50))), a(shift(e['view'], (6, 6, 8))),
                 a(w), a(e['tooltip']), a(text), a(text, '70'), a(e['accent'])]
-    return '# GENERATED by fm-tweaks (qt_theme_conf) - read by ~/.themes/qt-fm/libqt-fm.so\n[colors]\nactive=%s\ninactive=%s\ndisabled=%s\n\n%s[icons]\ntheme=%s\n\n[ui.smplayer]\nmenubar_hidden=%s\nmenubar_key=%s\nhide_dock_titles=%s\nhide_logo=%s\nhide_playlist_toolbar=%s\nplaylist_number_col_width=%s\n' % (', '.join(roles(False)), ', '.join(roles(False)), ', '.join(roles(True)), ('[fonts]\ngeneral=%s\n\n' % font if font else ''), QT_ICON_THEME, e['menubar_hidden'], e['menubar_key'], e['hide_dock_titles'], e['hide_logo'], e['hide_playlist_toolbar'], e['playlist_number_col_width'])
+    return '# GENERATED by fm-tweaks (qt_theme_conf) - read by ~/.themes/qt-fm/libqt-fm.so\n[colors]\nactive=%s\ninactive=%s\ndisabled=%s\n\n%s[icons]\ntheme=%s\n\n[ui.smplayer]\nmenubar_hidden=%s\nmenubar_key=%s\nhide_dock_titles=%s\nhide_logo=%s\nhide_playlist_toolbar=%s\nplaylist_number_col_width=%s\ncontrol_icon_color=%s\nfloating_icon_color=%s\n' % (', '.join(roles(False)), ', '.join(roles(False)), ', '.join(roles(True)), ('[fonts]\ngeneral=%s\n\n' % font if font else ''), QT_ICON_THEME, e['menubar_hidden'], e['menubar_key'], e['hide_dock_titles'], e['hide_logo'], e['hide_playlist_toolbar'], e['playlist_number_col_width'], ('#' + e['smcontrolicon']) if e['smcontrolicon'] else '', ('#' + e['smfloaticon']) if e['smfloaticon'] else '')
 
 def render(name, t):
     text = open(os.path.join(TEMPLATES, name)).read()
@@ -251,6 +251,38 @@ def render(name, t):
     if missing:
         sys.exit('fm-tweaks: template %s uses unknown token(s): %s' % (name, ', '.join(sorted(missing))))
     return re.sub(r'\{\{(\w+)\}\}', lambda m: t[m.group(1)], text)
+
+FOLDER_FILL = re.compile(r'style="fill:#([0-9a-f]{6})"')   # exactly three in bin/round-folder-icons' design, in this order: back layer, paper, front panel (the white highlight has opacity first, so it never matches)
+
+def folder_icon_files():
+    f = [os.path.join(ICON_DIR, 'fm-folders/folder.svg'), os.path.join(ICON_DIR, 'fm-folders/places/scalable/folder.svg')]
+    for top in ('places', 'places@2x'):
+        for size in ('16', '22', '24', 'scalable'):
+            f.append(os.path.join(ICON_DIR, 'MacTahoe-nord-dark', top, size, 'folder.svg'))
+    return [p for p in f if os.path.isfile(p) and not os.path.islink(p)]
+
+# PNG-based folder (Debian's lt_grey_final.png wrapped in an SVG): its dominant colour, so the tint maps that colour to the swatch colour and keeps the shading
+FOLDER_PNG_REF = (224, 236, 240)
+def tint_png_folder(s, color):
+    f = ' '.join('%.4f' % (int(color[i:i + 2], 16) / FOLDER_PNG_REF[i // 2]) for i in (0, 2, 4))
+    fr, fg, fb = f.split()
+    s = re.sub(r'<defs><filter id="fmtint".*?</defs>', '', s, flags=re.S).replace(' filter="url(#fmtint)"', '')
+    defs = ('<defs><filter id="fmtint" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="%s 0 0 0 0  0 %s 0 0 0  0 0 %s 0 0  0 0 0 1 0"/></filter></defs>' % (fr, fg, fb))
+    s = re.sub(r'(<svg[^>]*>)', lambda m: m.group(1) + defs, s, count=1)
+    return s.replace('<image ', '<image filter="url(#fmtint)" ', 1)
+
+def folder_icons(color):
+    back, paper = shift(color, (-24,) * 3), shift(color, (27,) * 3)
+    out = []
+    for p in folder_icon_files():
+        s = open(p).read()
+        if '<image' in s and 'base64,' in s:
+            out.append((p, tint_png_folder(s, color))); continue
+        if len(FOLDER_FILL.findall(s)) != 3:
+            print('fm-tweaks: %s does not look like the round-folder-icons design (skipped)' % p, file=sys.stderr); continue
+        cols = iter((back, paper, color))
+        out.append((p, FOLDER_FILL.sub(lambda m: 'style="fill:#%s"' % next(cols), s)))
+    return out
 
 def outputs(e):
     v = read_conf()
@@ -263,16 +295,11 @@ def outputs(e):
         (os.path.join(THUNAR_OUT, 'user.css'), render('thunar-user.css.in', t)),
         (os.path.join(THUNAR_OUT, 'gtk4.css'), render('thunar-gtk4.css.in', t)),
         (QT_QSS, shared),
-        (KCOLOR_QSS, shared.rstrip('\n') + '\n' + KCOLOR_EXTRA),
         (QT_THEME, qt_theme_conf(e, t, QT_FONT)),
         (QT_THEME_SM, qt_theme_conf(sm, tsm)),
-        (KDE_SCHEME, kde_scheme(e)),
-    ] + [(os.path.join(os.path.dirname(SMPLAYER_QSS), n), svg) for n, svg in qt_svgs(sm).items()] + [
-        (SMPLAYER_QSS, shared_sm.replace('border-radius: 10px', 'border-radius: %dpx' % SMPLAYER_MENU_RADIUS[0]).replace('border-radius: 5px', 'border-radius: %dpx' % SMPLAYER_MENU_RADIUS[1]).rstrip('\n') + '\n\n' + render('smplayer.qss.in', tsm)),
+    ] + folder_icons(e['foldercolor']) + [(os.path.join(os.path.dirname(SMPLAYER_QSS), n), svg) for n, svg in qt_svgs(sm).items()] + [
+        (SMPLAYER_QSS, shared_sm.rstrip('\n') + '\n\n' + render('smplayer.qss.in', tsm)),
     ]
-    kg = os.path.realpath(KDEGLOBALS)   # ~/.config/kdeglobals is a symlink into ~/.themes: write the target, never replace the link
-    if os.path.exists(kg):
-        out.append((kg, kdeglobals_text(e, open(kg).read())))
     return out
 
 def link_smplayer_icons(dry):

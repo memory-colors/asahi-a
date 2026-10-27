@@ -18,6 +18,81 @@ ROLE="${1:-}"
 ARG="${2:-}"
 GTK4_CSS="$HOME/.config/gtk-4.0/gtk.css"
 
+# role inactive: NO window buttons / header bar buttons, menus, search fields and title text = bar colour in INACTIVE windows, for every GTK app (user rule 2026-10-24). Own marked block at the end of gtk-4.0/gtk.css and gtk-3.0/gtk.css.
+# The bar colour is the headerbar colour token; apps with their own titlebar block (Text Editor, X11 frames, the gtk role) repeat the title rule with their own hex.
+if [ "$ROLE" == "inactive" ]; then
+    python3 - "$GTK4_CSS" "$HOME/.config/gtk-3.0/gtk.css" <<'PYEOF'
+import sys
+B = '/* KNOMADIC: inactive-titlebar BEGIN - do not edit by hand, see set-gtk-titlebar-color.sh */'
+E = '/* KNOMADIC: inactive-titlebar END */'
+G4 = """headerbar windowcontrols button.close:backdrop,
+headerbar windowcontrols button.maximize:backdrop,
+headerbar windowcontrols button.minimize:backdrop,
+headerbar:backdrop button,
+headerbar:backdrop menubutton,
+headerbar:backdrop splitbutton,
+headerbar:backdrop entry,
+headerbar:backdrop searchentry,
+headerbar:backdrop viewswitcher,
+headerbar:backdrop stackswitcher,
+headerbar:backdrop dropdown,
+headerbar:backdrop switch {
+  opacity: 0;
+}
+headerbar:backdrop .title,
+headerbar:backdrop .subtitle,
+headerbar:backdrop windowtitle label {
+  color: @headerbar_bg_color;
+}
+window .sidebar-pane headerbar:backdrop .title,
+window .sidebar-pane headerbar:backdrop .subtitle,
+window .sidebar-pane headerbar:backdrop windowtitle label {
+  color: @sidebar_bg_color;
+}"""
+G3 = """headerbar:backdrop button,
+headerbar:backdrop menubutton,
+headerbar:backdrop entry,
+headerbar:backdrop switch,
+.titlebar:backdrop button,
+.titlebar:backdrop menubutton,
+.titlebar:backdrop entry {
+  opacity: 0;
+}
+headerbar .icon.titlebutton,
+.titlebar .icon.titlebutton {
+  opacity: 0;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+headerbar:backdrop,
+.titlebar:backdrop:not(headerbar) {
+  background-color: @headerbar_bg_color;
+  background-image: none;
+}
+headerbar:backdrop .title,
+headerbar:backdrop .subtitle,
+.titlebar:backdrop .title,
+.titlebar:backdrop .subtitle,
+.default-decoration .title:backdrop,
+.default-decoration .subtitle:backdrop,
+headerbar.default-decoration:backdrop .title,
+headerbar.default-decoration:backdrop .subtitle {
+  color: @headerbar_bg_color;
+}"""
+for path, body in ((sys.argv[1], G4), (sys.argv[2], G3)):
+    t = open(path).read()
+    if B in t:
+        i = t.index(B); j = t.index(E) + len(E)
+        t = t[:i].rstrip('\n') + '\n' + t[j:].lstrip('\n') if t[j:].strip() else t[:i].rstrip('\n') + '\n'
+    t = t.rstrip('\n') + '\n\n' + B + '\n' + body + '\n' + E + '\n'
+    open(path, 'w').write(t)
+    print('inactive-titlebar written:', path)
+PYEOF
+    exit 0
+fi
+
 case "$ROLE" in
     gtk) NAME="gtk-titlebar"
          SEL='window headerbar:not(.default-decoration),
@@ -67,11 +142,39 @@ if [ ! -f "$GTK4_CSS" ]; then
     exit 1
 fi
 
+# no line under the headerbar (active or inactive): border + libadwaita's inset shade shadow off.
+# gtk role only: headers INSIDE a split-view sidebar pane (Settings, Tweaks...) stay transparent so the lighter sidebar colour shows through (libadwaita's own `.sidebar-pane headerbar` rule; the block above would otherwise out-rank it)
+EXTRA=""
+if [ "$ROLE" == "x11" ]; then
+    EXTRA="
+/* no window icon in the frame, active or inactive (VeraCrypt etc.): hidden and collapsed */
+headerbar.default-decoration windowcontrols image.icon {
+  opacity: 0;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  -gtk-icon-size: 0px;
+}"
+fi
+if [ "$ROLE" == "gtk" ]; then
+    EXTRA="
+window .sidebar-pane headerbar:not(.default-decoration),
+window .sidebar-pane headerbar:not(.default-decoration):backdrop {
+  background-color: transparent;
+}"
+fi
+# inactive window: the title text disappears into the bar (window buttons: see the `inactive` role)
+TITLE_SEL=$(printf '%s\n' "$SEL" | grep -v ':backdrop$' | sed 's/,$//' | sed 's/$/:backdrop .title,/' ; printf '%s\n' "$SEL" | grep -v ':backdrop$' | sed 's/,$//' | sed 's/$/:backdrop .subtitle/')
 BLOCK="$MARK_BEGIN
 $SEL {
   background-color: #$NEW_HEX;
-  border-bottom: 1px solid mix(black,#$NEW_HEX,0.25);
+  border-bottom: none;
+  box-shadow: none;
 }
+$TITLE_SEL {
+  color: #$NEW_HEX;
+}$EXTRA
 $MARK_END"
 
 python3 - "$GTK4_CSS" "$MARK_BEGIN" "$MARK_END" "$BLOCK" "$ROLE" <<'PYEOF'

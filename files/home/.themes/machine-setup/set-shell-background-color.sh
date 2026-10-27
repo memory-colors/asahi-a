@@ -24,7 +24,6 @@ NEW="${1#\#}"; NEW="${NEW,,}"
 OLD="$(get)"
 [ -n "$OLD" ] || { echo "Error: '#overview { background-color }' rule not found." >&2; exit 1; }
 if [ "$OLD" != "$NEW" ]; then
-    cp "$CSS" "${CSS}.bak-pre-overview-bg-${NEW}"
     python3 - "$CSS" "$NEW" <<'PYEOF'
 import re, sys
 p, new = sys.argv[1:3]

@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48" version="1"><g transform="translate(0,-2.486) scale(1,1.081)">
  <path style="opacity:0.2" d="M 4,19 A 2,2 0 0 1 6,17 H 38 A 6,6 0 0 1 44,23 V 37 A 6,6 0 0 1 38,43 H 10 A 6,6 0 0 1 4,37 Z"/>
- <path style="fill:#cccccc" d="M 4,34 C 4,35.108 4.892,36 6,36 H 42 C 43.108,36 44,35.108 44,34 V 16 A 6,6 0 0 0 38,10 H 24 C 21,10 20,6 17,6 H 6 C 4.892,6 4,6.892 4,8"/>
+ <path style="fill:#a19eaa" d="M 4,34 C 4,35.108 4.892,36 6,36 H 42 C 43.108,36 44,35.108 44,34 V 16 A 6,6 0 0 0 38,10 H 24 C 21,10 20,6 17,6 H 6 C 4.892,6 4,6.892 4,8"/>
  <path style="opacity:0.2" d="M 4,17 A 2,2 0 0 1 6,15 H 38 A 6,6 0 0 1 44,21 V 35 A 6,6 0 0 1 38,41 H 10 A 6,6 0 0 1 4,35 Z"/>
- <rect style="fill:#ffffff" width="32" height="16" x="6" y="13" rx="2" ry="2"/>
- <path style="fill:#e4e4e4" d="M 4,18 A 2,2 0 0 1 6,16 H 38 A 6,6 0 0 1 44,22 V 36 A 6,6 0 0 1 38,42 H 10 A 6,6 0 0 1 4,36 Z"/>
+ <rect style="fill:#d4d1dd" width="32" height="16" x="6" y="13" rx="2" ry="2"/>
+ <path style="fill:#b9b6c2" d="M 4,18 A 2,2 0 0 1 6,16 H 38 A 6,6 0 0 1 44,22 V 36 A 6,6 0 0 1 38,42 H 10 A 6,6 0 0 1 4,36 Z"/>
  <path style="opacity:0.1;fill:#ffffff" d="M 6,6 C 4.892,6 4,6.892 4,8 V 9 C 4,7.892 4.892,7 6,7 H 17 C 20,7 21,11 24,11 H 38 A 6,6 0 0 1 44,17 V 16 A 6,6 0 0 0 38,10 H 24 C 21,10 20,6 17,6 Z"/>
 </g>
 </svg>

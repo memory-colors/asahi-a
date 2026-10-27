@@ -77,14 +77,10 @@
       <default>1.0</default>
     </key>
 
-    <!-- ── Behaviour ───────────────────────────────────────────────────── -->
-    <key name="keep-rounded-maximized" type="b">
-      <default>false</default>
-      <summary>Keep rounded corners when a window is maximized</summary>
-    </key>
-    <key name="keep-rounded-fullscreen" type="b">
-      <default>false</default>
-      <summary>Keep rounded corners when a window is full-screen</summary>
+    <!-- ── Tiling (Tiling Assistant folded in, see tiling/NOTICE.md) ─────── -->
+    <key name="quarter-tiling" type="b">
+      <default>true</default>
+      <summary>Quarter tiling: drag a window to a screen corner (Tiling Assistant, folded in)</summary>
     </key>
 
     <!-- ── Custom shadow ───────────────────────────────────────────────── -->
@@ -251,41 +247,6 @@
     <key name="topbar-intellihide-key-toggle" type="as">
       <default><![CDATA[['<Super>i']]]></default>
       <summary>Shortcut: hold the bar revealed / release</summary>
-    </key>
-
-    <!-- ===== Window Gap (merged from window-gap@blank.local, 2026-10-07). Defaults = the user's values. ===== -->
-    <key name="windowgap-uniform" type="b">
-      <default>true</default>
-      <summary>Same gap on all edges</summary>
-    </key>
-    <key name="windowgap-gap-size" type="i">
-      <range min="0" max="200"/>
-      <default>8</default>
-      <summary>Uniform gap size (px)</summary>
-    </key>
-    <key name="windowgap-margin-top" type="i">
-      <range min="0" max="200"/>
-      <default>20</default>
-      <summary>Top margin (px)</summary>
-    </key>
-    <key name="windowgap-margin-bottom" type="i">
-      <range min="0" max="200"/>
-      <default>20</default>
-      <summary>Bottom margin (px)</summary>
-    </key>
-    <key name="windowgap-margin-left" type="i">
-      <range min="0" max="200"/>
-      <default>20</default>
-      <summary>Left margin (px)</summary>
-    </key>
-    <key name="windowgap-margin-right" type="i">
-      <range min="0" max="200"/>
-      <default>20</default>
-      <summary>Right margin (px)</summary>
-    </key>
-    <key name="windowgap-no-gap-fullscreen" type="b">
-      <default>true</default>
-      <summary>No gap for fullscreen windows</summary>
     </key>
 
     <!-- ===== Shell theme name (merged from the stock User Themes extension, 2026-10-07) ===== -->

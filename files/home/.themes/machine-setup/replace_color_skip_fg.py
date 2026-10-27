@@ -10,7 +10,7 @@ Written 2026-10-01 after a real incident: set-dark-background.sh's old
 blind whole-file sed replace swept up a foreground/text color that happened
 to coincidentally equal the background hex at the time, turning fonts
 invisible (dark-grey-on-dark-grey) until manually found and fixed in the
-conf files. Both set-dark-background.sh and set-light-background.sh now
+conf files. The (since retired) dark/light background scripts and set-accent-color.sh
 route their file edits through this script instead of a bare `sed -i`.
 
 Lines inside KNOMADIC BEGIN/END blocks are skipped (added 2026-10-18).

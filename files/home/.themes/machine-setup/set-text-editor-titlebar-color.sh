@@ -13,7 +13,7 @@
 # matched anything, so no edit from that version ever visually took) - NOT
 # a generic `headerbar`. Its headerbar normally just
 # inherits GTK4's global `headerbar_bg_color` token, which is actually owned
-# by set-dark-background.sh's "Dark background" role (NOT
+# by the cooked sheet (the old "Dark background" role is retired; NOT
 # set-qt-titlebar-color.sh - that script only ever touches
 # ~/.config/qwhitesurgtkdecorations.conf, the KDE/Qt window-decoration
 # config, which a native libadwaita headerbar never reads).
@@ -21,8 +21,8 @@
 # This script instead writes a dedicated, anchor-scoped
 # `editor-window headerbar` block, appended to gtk-4.0/gtk.css between its
 # own marker comments - never touches the global headerbar_bg_color token
-# or any other app's headerbar, and is immune to set-dark-background.sh
-# or any grey-shift run overwriting it back.
+# or any other app's headerbar, and is immune to
+# any grey-shift run overwriting it back.
 #
 # Usage: ./set-text-editor-titlebar-color.sh <new-hex-color>
 #        ./set-text-editor-titlebar-color.sh --get   (print current hex, no changes)
@@ -67,7 +67,14 @@ $MARK_BEGIN
 window.org-gnome-TextEditor headerbar,
 window.org-gnome-TextEditor headerbar:backdrop {
   background-color: #$NEW_HEX;
-  border-bottom: 1px solid mix(black,#$NEW_HEX,0.25);
+  border-bottom: none;
+  box-shadow: none;
+}
+/* inactive window: the title text disappears into the bar */
+window.org-gnome-TextEditor headerbar:backdrop .title,
+window.org-gnome-TextEditor headerbar:backdrop .subtitle,
+window.org-gnome-TextEditor headerbar:backdrop windowtitle label {
+  color: #$NEW_HEX;
 }
 $MARK_END
 EOF

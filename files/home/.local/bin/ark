@@ -1,4 +1,0 @@
-#!/bin/sh
-# Ark: same Qt look as Konsole/kcolorchooser (qt-fm shim + qt-general.qss, no qt6ct). Real binary: /usr/bin/ark.
-exec env -u QT_QPA_PLATFORMTHEME QT_STYLE_OVERRIDE=Breeze LD_PRELOAD="$HOME/.themes/qt-fm/libqt-fm.so:$HOME/.themes/qt-noicons/libqt-noicons.so" \
-  /usr/bin/ark -stylesheet "$HOME/.themes/qt-fm/qt-general.qss" "$@"

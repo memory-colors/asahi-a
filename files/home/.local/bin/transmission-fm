@@ -1,0 +1,7 @@
+#!/bin/bash
+# Private Transmission build (Ctrl+M toggles menu bar, starts hidden); falls back to stock after a package update.
+d=$HOME/.local/libexec/transmission-gtk-fm
+if [ "$(cat "$d/built-for-package-version" 2>/dev/null)" = "$(rpm -q --qf '%{VERSION}-%{RELEASE}\n' transmission-gtk)" ]; then
+  exec "$d/transmission-gtk" "$@"
+fi
+exec /usr/bin/transmission-gtk "$@"

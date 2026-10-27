@@ -26,7 +26,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import PeekManager from '../../core/PeekManager.js';
 import { setBoxVertical } from '../../core/Utils.js';
-import { applyThemeStyle } from './ContextMenuStyle.js';
+import { applyThemeStyle, MENU_ARROW } from './ContextMenuStyle.js';
 import { TimeoutTracker } from '../../core/TimeoutTracker.js';
 import { attachTrashActions } from './TrashActionsHandler.js';
 import { createThumbnailScroll } from './WindowThumbnailBuilder.js';
@@ -271,7 +271,8 @@ export default class AppContextMenu {
 
         const isInsideFolder = this.buttonActor && this.buttonActor._inFolder;
         const isAppGrid = !this.peekManager && !isInsideFolder;
-        const gap = isInsideFolder ? -8 : (isAppGrid ? -8 : 22);
+        // 2026-10-23: without the 12 px arrow the body sits 12 px closer for the same gap, so the dock case is 22 -> 12 and the others -8 -> 4 (body stays put)
+        const gap = MENU_ARROW ? ((isInsideFolder || isAppGrid) ? -8 : 22) : ((isInsideFolder || isAppGrid) ? 4 : 12);
 
         let posX = btnX + (btnW / 2) - (panelW / 2);
         let posY = btnY;
@@ -351,7 +352,7 @@ export default class AppContextMenu {
             this.actor.set_position(0, 0);
             this.actor.set_size(global.stage.width, global.stage.height);
 
-            const ah = 12;
+            const ah = MENU_ARROW ? 12 : 0;
             let padBottom = 12, padTop = 12, padLeft = 12, padRight = 12;
             if (dockPosition === 'BOTTOM') padBottom += ah;
             else if (dockPosition === 'TOP') padTop += ah;

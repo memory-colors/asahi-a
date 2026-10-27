@@ -30,29 +30,10 @@
 # depend on vo=x11, which depends on XWayland - the native-Wayland
 # decoration plugin isn't compatible with that setup. Shelved per user
 # 2026-09-28 rather than chase a different vo driver right now.
-env -u QT_QPA_PLATFORMTHEME QT_STYLE_OVERRIDE=Breeze LD_PRELOAD="$HOME/.themes/qt-fm/libqt-fm.so:$HOME/.themes/qt-noicons/libqt-noicons.so" "$HOME/.local/opt/smplayer-qt6/bin/smplayer" "$@" &
+env QT_STYLE_OVERRIDE=Fusion FM_QT_THEME="$HOME/.config/fm-tweaks/qt-theme-smplayer.conf" LD_PRELOAD="$HOME/.themes/qt-fm/libqt-fm.so:$HOME/.themes/qt-noicons/libqt-noicons.so" "$HOME/.local/opt/smplayer-qt6/bin/smplayer" "$@" &
 SMPLAYER_PID=$!
 
-# Give the window time to actually map and take focus before tiling it -
-# too short and the keypress can land on the wrong window or get dropped.
-# Adjust this if it's tiling too early/late in practice.
-sleep 0.8
-# YDOTOOL_SOCKET must be explicit - the client's default path resolution
-# was observed to differ between invocation contexts (e.g. a nested sudo vs.
-# a direct shell), landing on /run/user/1000/.ydotool_socket in one and
-# /tmp/.ydotool_socket in another with no config change in between (likely
-# XDG_RUNTIME_DIR not being set consistently) - confirmed 2026-09-18. Pin it
-# to match ydotoold's own --socket-path in the systemd override
-# (/etc/systemd/system/ydotool.service.d/override.conf) rather than trust
-# either side's default.
-#
-# Key sequence updated 2026-09-20: GNOME's native tile-right shortcut was
-# rebound from plain Super+Right to Alt+Super+Right (`gsettings get
-# org.gnome.mutter.keybindings toggle-tiled-right` -> '<Alt><Super>Right') -
-# simulating the old combo just presses keys nothing is bound to anymore.
-# Added KEY_LEFTALT (56) to the sequence to match. Re-check with the same
-# gsettings command if this ever silently stops working again - it means
-# the shortcut moved again, not that ydotool/ydotoold broke.
-YDOTOOL_SOCKET=/tmp/.ydotool_socket ydotool key 56:1 125:1 106:1 106:0 125:0 56:0 2>/dev/null || true
+# Tiling right is done by the custom-gestures extension (SMPlayerTileRight, direct placement). The old ydotool tile-right chord (Alt+Super+Right)
+# was removed 2026-10-26: it left the XWayland client half-active (dead shortcuts, stuck traffic lights, ignored drops).
 
 wait "$SMPLAYER_PID"

@@ -216,13 +216,13 @@ Keywords[zh_CN]=磁盘;驱动器;卷;硬盘;光盘;盘;分区;映像;镜像;备�
 Keywords[zh_HK]=disk;drive;volume;harddisk;hdd;disc;cdrom;dvd;partition;iso;image;backup;restore;benchmark;raid;luks;encryption;S.M.A.R.T.;smart;磁碟;磁碟機;硬碟;哈滴;光碟機;光碟;分割區;映像檔;備份;還原;評等;加密;
 Keywords[zh_TW]=disk;drive;volume;harddisk;hdd;disc;cdrom;dvd;partition;iso;image;backup;restore;benchmark;raid;luks;encryption;S.M.A.R.T.;smart;磁碟;磁碟機;硬碟;哈滴;碟片機;碟片;分割區;映像檔;備份;還原;效能;評測;加密;
 Keywords=disk;drive;volume;harddisk;hdd;disc;cdrom;dvd;partition;iso;image;backup;restore;benchmark;raid;luks;encryption;S.M.A.R.T.;smart;
-Exec=gnome-disks
+Exec=env GTK_THEME=adw-gtk3-dark gnome-disks
 # Translators: Do NOT translate or transliterate this text (this is an icon file name)!
 Icon=org.gnome.DiskUtility
 Terminal=false
 Type=Application
 StartupNotify=true
 Categories=GNOME;GTK;Utility;X-GNOME-Utilities;
-DBusActivatable=true
+DBusActivatable=false
 X-Purism-FormFactor=Workstation;Mobile;
 X-GNOME-UsesNotifications=true

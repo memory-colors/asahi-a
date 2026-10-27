@@ -20,7 +20,7 @@
 		<config key="BackgroundTaskEnabled">1</config>
 		<config key="ForceAutoDismount">1</config>
 		<config key="Language">system</config>
-		<config key="LastSelectedSlotNumber">3</config>
+		<config key="LastSelectedSlotNumber">8</config>
 		<config key="MaxVolumeIdleTime">60</config>
 		<config key="MountDevicesOnLogon">0</config>
 		<config key="MountFavoritesOnLogon">0</config>

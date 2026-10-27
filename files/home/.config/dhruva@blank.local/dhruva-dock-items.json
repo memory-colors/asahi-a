@@ -10,13 +10,14 @@
     "thunar.desktop",
     "brave-browser.desktop",
     "smplayer.desktop",
-    "brave-geijiaoeofpopobjcbeafpacnjmhilfn-Default.desktop",
     "com.interversehq.qView.desktop",
-    "veracrypt.desktop",
+    "brave-geijiaoeofpopobjcbeafpacnjmhilfn-Default.desktop",
     "transmission-gtk.desktop",
+    "veracrypt.desktop",
     "restart-to-macos.desktop",
-    "org.gnome.TextEditor.desktop",
-    "org.kde.konsole.desktop"
+    "org.gnome.Shell.Extensions.desktop",
+    "org.gnome.Ptyxis.desktop",
+    "com.brave.Browser.desktop"
   ],
   "folders": []
 }

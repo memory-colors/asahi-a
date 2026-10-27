@@ -13,8 +13,10 @@ QMenuBar { background-color: {{tooltip}}; color: {{text}}; }
 QMenuBar::item { background: transparent; padding: 4px 8px; border-radius: 6px; }
 QMenuBar::item:selected { background-color: {{accent}}; color: {{hltext}}; }
 /* surface group */
-QDialog, QDockWidget, QToolBar, QStackedWidget { background-color: {{window}}; color: {{text}}; }
-QDockWidget::title { background-color: {{window}}; padding: 4px 6px; }
+QDialog, QToolBar, QStackedWidget { background-color: {{window}}; color: {{text}}; }
+QDockWidget, PlaylistDock, Playlist { background-color: {{view}}; color: {{text}}; }   /* playlist frame = the list's own near-black (was the grey surface colour, which also drives the floating panel) */
+QMainWindow::separator { background-color: {{button}}; }   /* the strip between video and playlist (= the Name bar colour so it blends) */
+QDockWidget::title { background-color: {{view}}; padding: 4px 6px; }
 QToolBar { border: none; spacing: 2px; }
 QTabWidget::pane { background-color: {{window}}; border: 1px solid {{tipborder}}; border-radius: 6px; }
 QTabBar::tab { background: transparent; color: {{text}}; padding: 4px 10px; border-radius: 6px; margin: 2px; }
@@ -22,14 +24,26 @@ QTabBar::tab:selected { background-color: {{accent}}; color: {{hltext}}; }
 QTabBar::tab:hover:!selected { background-color: {{button}}; }
 QGroupBox { border: 1px solid {{tipborder}}; border-radius: 8px; margin-top: 12px; padding-top: 6px; }
 QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }
+/* floating control panel (AutohideWidget; padding comes from the qt-fm shim, [ui.smplayer] floating_padding) */
+AutohideWidget { background-color: {{floatbg}}; border-radius: 0; }
+AutohideWidget QLabel { color: {{floattext}}; }
+QToolBar#controlwidget, QToolBar#controlwidget_mini { background-color: {{controlbg}}; }   /* main control bar (own swatch; was the Panels colour). NO QSS padding on a QToolBar (any side makes it taller): side gaps = shim contents margins control_pad_left/right */
+QToolBar#controlwidget QToolButton, QToolBar#controlwidget_mini QToolButton { padding: 5px 3px; }   /* ~4px taller bar; icons stay 16px */
+AutohideWidget QToolBar { background: transparent; }
+AutohideWidget QToolButton { padding: 1px; }   /* tighter buttons for the 16px icons (the general QToolButton rule adds 3px) */
+AutohideWidget QToolBar::separator { background: transparent; width: 6px; border: none; }
 /* content group */
 QListView, QListWidget, QTreeView, QTableView, QTextEdit, QPlainTextEdit, QTextBrowser { background-color: {{view}}; color: {{text}}; alternate-background-color: {{view}}; border: none; selection-background-color: {{accent}}; selection-color: {{hltext}}; }
 QListView::item:selected, QListWidget::item:selected, QTreeView::item:selected, QTableView::item:selected { background-color: {{accent}}; color: {{hltext}}; border-radius: 6px; }
 QListView::item:hover:!selected, QListWidget::item:hover:!selected, QTreeView::item:hover:!selected { background-color: {{button}}; border-radius: 6px; }
-/* separator lines (Preferences): the patched Breeze paints them from bluegrey.colors, i.e. the GENERAL palette; draw them from the content swatch instead so SMPlayer stays independent */
+/* separator lines (Preferences): Breeze used to paint them from the general palette; draw them from the content swatch instead so SMPlayer stays independent */
 QFrame[frameShape="4"], QFrame[frameShape="5"] { border: none; background-color: {{view}}; }
 /* field group */
-QHeaderView::section { background-color: {{button}}; color: {{buttontext}}; border: none; padding: 1px 6px; min-height: 24px; max-height: 24px; }
+QTableView#playlist_table { font-size: 12pt; color: {{playlisttext}}; }   /* playlist rows 12pt; the Name bar stays 10pt (next rule) */
+QTableView#playlist_table::item:hover:!selected { background-color: rgba({{accent_dec}}, 64); border-radius: 6px; }   /* hover decoration, same as list rows */
+QTableView#playlist_table QHeaderView, QTableView#playlist_table QHeaderView::section { font-size: 11pt; font-family: "SF Pro Medium"; }
+QTableView#playlist_table QHeaderView { color: {{headertext}}; }   /* the sort arrow uses the header widget's palette colour, not the ::section colour */
+QHeaderView::section { background-color: {{button}}; color: {{headertext}}; border: none; padding: 0 6px 1px 6px; min-height: 19px; max-height: 19px; }   /* fits 11pt text (17px would clip) */
 QLineEdit, QAbstractSpinBox, QComboBox { background-color: {{button}}; color: {{buttontext}}; border: 1px solid transparent; border-radius: 6px; padding: 3px 6px; selection-background-color: {{accent}}; selection-color: {{hltext}}; }
 QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border: 1px solid {{accent}}; }
 QComboBox::drop-down { border: none; width: 20px; }
@@ -51,9 +65,13 @@ QScrollBar:horizontal { background: transparent; height: 10px; margin: 0; }
 QScrollBar::handle { background-color: {{button}}; border-radius: 5px; min-height: 24px; min-width: 24px; }
 QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
 QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
+QTableView#playlist_table QScrollBar:vertical { width: 0; }   /* playlist: no visible scrollbar (wheel / touchpad scrolling still works) */
+QTableView#playlist_table QScrollBar:horizontal { height: 0; }
 QSlider::groove:horizontal { background-color: {{button}}; height: 4px; border-radius: 2px; }
 QSlider::sub-page:horizontal { background-color: {{accent}}; border-radius: 2px; }
 QSlider::handle:horizontal { background-color: {{text}}; width: 12px; height: 12px; margin: -4px 0; border-radius: 6px; }
+QToolBar#controlwidget QSlider::handle:horizontal, QToolBar#controlwidget_mini QSlider::handle:horizontal { background-color: {{controlknob}}; }
+AutohideWidget QSlider::handle:horizontal { background-color: {{floatknob}}; }
 QProgressBar { background-color: {{button}}; border: none; border-radius: 5px; text-align: center; color: {{text}}; }
 QProgressBar::chunk { background-color: {{accent}}; border-radius: 5px; }
 QCheckBox::indicator, QRadioButton::indicator { width: 16px; height: 16px; border-radius: 4px; background-color: {{button}}; }
@@ -62,6 +80,9 @@ QCheckBox::indicator:checked { background-color: {{accent}}; image: url(check.sv
 QRadioButton::indicator:checked { background-color: {{accent}}; image: url(radio.svg); }
 QCheckBox::indicator:disabled, QRadioButton::indicator:disabled { background-color: {{window}}; }
 /* status group */
-QStatusBar { background-color: {{statusbar}}; color: {{statustext}}; }
-QStatusBar QLabel, QStatusBar QToolButton { color: {{statustext}}; background: transparent; }
+QStatusBar { background-color: {{statusbar}}; color: {{statustext}} ; }
+QStatusBar { font-size: 12pt; font-family: "SF Pro Medium"; }   /* "Ready"/messages are painted by the bar itself, not a QLabel */
+QStatusBar QLabel, QStatusBar QToolButton { font-size: 12pt; font-family: "SF Pro Medium"; color: {{statustext}}; background: transparent; }
+/* push the status text in from the bar edges (horizontal only, bar height unchanged) */
+QStatusBar QLabel { padding-left: 14px; padding-right: 18px; }
 QStatusBar::item { border: none; }

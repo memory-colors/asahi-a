@@ -140,7 +140,6 @@ if [ "$OLD_HEX" == "$NEW_HEX" ]; then
 fi
 
 echo "Changing shell accent #$OLD_HEX -> #$NEW_HEX"
-cp "$CSS" "${CSS}.bak-pre-shell-accent-${NEW_HEX}"
 
 python3 - "$CSS" "$OLD_HEX" "$NEW_HEX" <<'PYEOF'
 import re, sys

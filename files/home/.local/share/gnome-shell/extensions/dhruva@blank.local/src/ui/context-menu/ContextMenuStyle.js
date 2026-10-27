@@ -26,6 +26,9 @@ import { traceMenuPath } from '../shared/MenuShape.js';
 const CORNER_RADIUS = 18;
 const ARROW_HEIGHT = 12;
 const ARROW_WIDTH = 24;
+// 2026-10-23: the pointer arrow (and the ARROW_HEIGHT strip reserved for it under/over/beside the menu body) is OFF: it read as
+// blank space below "Quit". To get it back: set true here (AppContextMenu.js reads it too for the padding and the gap).
+export const MENU_ARROW = false;
 
 function parseRgba(str) {
     const m = (str || '').match(/[\d.]+/g);
@@ -93,7 +96,15 @@ export function applyThemeStyle(contextMenu, panel) {
         cr.restore();
 
         cr.translate(half, half);
-        traceMenuPath(cr, w, h, CORNER_RADIUS, ARROW_HEIGHT, ARROW_WIDTH, contextMenu._dockPos, ax, ay);
+        if (MENU_ARROW) traceMenuPath(cr, w, h, CORNER_RADIUS, ARROW_HEIGHT, ARROW_WIDTH, contextMenu._dockPos, ax, ay);
+        else {
+            cr.newPath();
+            cr.arc(w - CORNER_RADIUS, CORNER_RADIUS, CORNER_RADIUS, -Math.PI / 2, 0);
+            cr.arc(w - CORNER_RADIUS, h - CORNER_RADIUS, CORNER_RADIUS, 0, Math.PI / 2);
+            cr.arc(CORNER_RADIUS, h - CORNER_RADIUS, CORNER_RADIUS, Math.PI / 2, Math.PI);
+            cr.arc(CORNER_RADIUS, CORNER_RADIUS, CORNER_RADIUS, Math.PI, 3 * Math.PI / 2);
+            cr.closePath();
+        }
 
         const [br, bg, bb, ba] = parseRgba(area._bgRgba);
         cr.setSourceRGBA(br / 255, bg / 255, bb / 255, ba);

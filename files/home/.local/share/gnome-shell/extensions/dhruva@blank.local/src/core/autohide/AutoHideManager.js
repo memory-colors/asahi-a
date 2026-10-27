@@ -118,7 +118,10 @@ export default class AutoHideManager {
         );
 
         global.workspace_manager.connectObject(
-            'active-workspace-changed', () => this.scheduleCheck(20),
+            // windows that already existed on another workspace when this started were never tracked (only the
+            // active workspace was rebound), so their later move/size changes (e.g. corner tiling) never
+            // scheduled a check there and the dock stayed visible: bind that workspace's windows on arrival
+            'active-workspace-changed', () => { this._rebindAllOpenWindows(); this.scheduleCheck(20); },
             this
         );
 

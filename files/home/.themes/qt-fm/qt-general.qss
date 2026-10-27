@@ -3,13 +3,13 @@
 QMenu {
     background-color: #2c2c34;
     border: 1px solid #45454d;
-    border-radius: 10px;
+    border-radius: 16px;
     padding: 4px;
 }
 QMenu::item {
     padding: 4px 22px 4px 10px;
     margin-left: 0px;
-    border-radius: 5px;
+    border-radius: 6px;
     font-size: 16px;
 }
 /* KNOMADIC: noicons-menu-padding - menus_have_icons=false / the noicons LD_PRELOAD shim stop Qt from drawing menu icons,
@@ -23,7 +23,7 @@ QMenu::item:selected {
     background-color: #483676;
     selection-background-color: #483676;
     border: none;
-    color: white;
+    color: #ffffff;
 }
 QMenu::separator {
     height: 1px;
@@ -31,8 +31,9 @@ QMenu::separator {
 }
 QToolTip {
     background-color: #2c2c34;
+    color: #d6d3e0;
     border: 1px solid #3e3e46;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 4px 8px;
     font-size: 16px;
 }

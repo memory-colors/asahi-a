@@ -2,14 +2,14 @@
    GENERATED output - edit the template / fm-tweaks.conf, not this file. */
 QMenu {
     background-color: {{tooltip}};
-    border: 1px solid #45454d;
-    border-radius: 10px;
+    border: 1px solid {{menuborder}};
+    border-radius: 16px;
     padding: 4px;
 }
 QMenu::item {
     padding: 4px 22px 4px 10px;
     margin-left: 0px;
-    border-radius: 5px;
+    border-radius: 6px;
     font-size: 16px;
 }
 /* KNOMADIC: noicons-menu-padding - menus_have_icons=false / the noicons LD_PRELOAD shim stop Qt from drawing menu icons,
@@ -23,7 +23,7 @@ QMenu::item:selected {
     background-color: {{accent}};
     selection-background-color: {{accent}};
     border: none;
-    color: white;
+    color: {{menuhltext}};
 }
 QMenu::separator {
     height: 1px;
@@ -31,8 +31,9 @@ QMenu::separator {
 }
 QToolTip {
     background-color: {{tooltip}};
+    color: {{text}};
     border: 1px solid {{tipborder}};
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 4px 8px;
     font-size: 16px;
 }

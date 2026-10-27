@@ -1,6 +1,6 @@
 /* Personal overrides on top of adw-gtk3-dark - just accent color and
    headerbar/titlebar grey, kept in sync with the gtk-4.0 theme pack and the
-   modded Qt window-decoration plugin (both use #1f1f24 for the titlebar).
+   modded Qt window-decoration plugin (both use #18181c for the titlebar).
    Everything else is left to adw-gtk3-dark itself. */
 
 /* #5a3e8b is the REAL accent used by gtk-4.0/gtk.css (accent_bg_color there is
@@ -8,7 +8,7 @@
    most of a very long debugging session. Corrected 2026-09-26. */
 @define-color accent_bg_color #5a3e8b;
 @define-color accent_color #5a3e8b;
-@define-color headerbar_bg_color #1f1f24;
+@define-color headerbar_bg_color #18181c;
 
 /* This theme's checkboxes, list-row selections, and text-selection highlight
    consult theme_selected_bg_color/selected_bg_color specifically - a
@@ -65,7 +65,13 @@ list row:selected:backdrop {
    titlebar. */
 headerbar:backdrop {
   color: #FDFDFD;
-  border-color: mix(black, #1f1f24, 0.25);
+  border-color: mix(black, #18181c, 0.25);
+}
+
+/* no line under any headerbar, active or inactive (adw-gtk3 keeps a 1px bottom border + 1px shadow) */
+headerbar, headerbar:backdrop, .titlebar, .titlebar:backdrop {
+  border-bottom-width: 0;
+  box-shadow: none;
 }
 
 /* Traffic light titlebuttons — overrides adw-gtk3-dark's CSS circles */
@@ -139,3 +145,864 @@ row label.subtitle {
   opacity: 0.75;
 }
 /* KNOMADIC: text-brightness END */
+/* KNOMADIC: gtk-selection BEGIN - do not edit by hand, see set-gtk-color.sh */
+@define-color theme_selected_bg_color #5a3e8b;
+@define-color selected_bg_color #5a3e8b;
+entry selection,
+entry selection:focus,
+spinbutton:not(.vertical) selection,
+textview text selection,
+textview text selection:focus,
+.view text selection,
+.view text selection:focus,
+iconview text selection,
+iconview text selection:focus,
+label selection,
+.view text:selected,
+textview text:selected,
+iconview text:selected,
+flowbox flowboxchild:selected {
+  background-color: #5a3e8b;
+}
+/* KNOMADIC: gtk-selection END */
+/* KNOMADIC: inactive-titlebar BEGIN - do not edit by hand, see set-gtk-titlebar-color.sh */
+headerbar:backdrop button,
+headerbar:backdrop menubutton,
+headerbar:backdrop entry,
+headerbar:backdrop switch,
+.titlebar:backdrop button,
+.titlebar:backdrop menubutton,
+.titlebar:backdrop entry {
+  opacity: 0;
+}
+headerbar .icon.titlebutton,
+.titlebar .icon.titlebutton {
+  opacity: 0;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+headerbar:backdrop,
+.titlebar:backdrop:not(headerbar) {
+  background-color: @headerbar_bg_color;
+  background-image: none;
+}
+headerbar:backdrop .title,
+headerbar:backdrop .subtitle,
+.titlebar:backdrop .title,
+.titlebar:backdrop .subtitle,
+.default-decoration .title:backdrop,
+.default-decoration .subtitle:backdrop,
+headerbar.default-decoration:backdrop .title,
+headerbar.default-decoration:backdrop .subtitle {
+  color: @headerbar_bg_color;
+}
+/* KNOMADIC: inactive-titlebar END */
+/* KNOMADIC: gtk-scrollbar BEGIN - do not edit by hand, see set-gtk-color.sh */
+scrollbar slider,
+scrollbar.overlay-indicator:not(.dragging):not(.hovering) slider {
+  background-color: @accent_bg_color;
+}
+scrollbar slider:hover {
+  background-color: @accent_bg_color;
+}
+scrollbar slider:hover:active {
+  background-color: mix(@accent_bg_color, #000000, 0.15);
+}
+scrollbar slider:disabled {
+  background-color: transparent;
+}
+scrollbar.fine-tune slider, scrollbar.fine-tune slider:hover, scrollbar.fine-tune slider:active {
+  background-color: @accent_bg_color;
+}
+scrollbar.overlay-indicator:not(.dragging):not(.hovering) {
+  opacity: 0.7;
+}
+scrollbar.overlay-indicator.dragging,
+scrollbar.overlay-indicator.hovering {
+  opacity: 1;
+}
+scrollbar.overlay-indicator {
+  transition: opacity 250ms ease-in-out;
+}
+/* KNOMADIC: gtk-scrollbar END */
+/* KNOMADIC: gtk-text BEGIN - do not edit by hand, see set-gtk-color.sh */
+@define-color window_fg_color #cecee2;
+@define-color view_fg_color #cecee2;
+@define-color sidebar_fg_color #cecee2;
+@define-color secondary_sidebar_fg_color #cecee2;
+@define-color card_fg_color #cecee2;
+@define-color dialog_fg_color #cecee2;
+@define-color popover_fg_color #cecee2;
+@define-color theme_fg_color #cecee2;
+@define-color fg_color #cecee2;
+@define-color theme_unfocused_fg_color #cecee2;
+/* KNOMADIC: gtk-text END */
+/* KNOMADIC: gtk-dark BEGIN - do not edit by hand, see set-gtk-color.sh */
+@define-color view_bg_color #161618;
+/* KNOMADIC: gtk-dark END */
+
+/* KNOMADIC: gtk-inactive BEGIN - do not edit by hand, see set-gtk-color.sh */
+.content-view .tile:backdrop {
+  background-color: black;
+}
+button.osd:backdrop {
+  color: white;
+  background-color: rgba(0, 0, 0, 0.65);
+}
+.app-notification button:backdrop {
+  color: white;
+  background-color: rgba(0, 0, 0, 0.65);
+}
+popover.background.touch-selection button:backdrop {
+  color: white;
+  background-color: rgba(0, 0, 0, 0.65);
+}
+popover.background.magnifier button:backdrop {
+  color: white;
+  background-color: rgba(0, 0, 0, 0.65);
+}
+.osd button:backdrop {
+  color: white;
+  background-color: rgba(0, 0, 0, 0.65);
+}
+.osd button.suggested-action:backdrop {
+  color: white;
+  background-color: rgba(0, 0, 0, 0.65);
+}
+.osd button.destructive-action:backdrop {
+  color: white;
+  background-color: rgba(0, 0, 0, 0.65);
+}
+.inline-toolbar toolbutton > button:backdrop {
+  color: @window_fg_color;
+}
+.inline-toolbar toolbutton > button:backdrop:active {
+  color: @window_fg_color;
+}
+.inline-toolbar toolbutton > button:backdrop:checked {
+  color: @window_fg_color;
+}
+.inline-toolbar toolbutton > button:backdrop:active:hover {
+  background-color: mix(@window_fg_color,@window_bg_color,0.65);
+}
+.inline-toolbar toolbutton > button:backdrop:checked:hover {
+  background-color: mix(@window_fg_color,@window_bg_color,0.65);
+}
+messagedialog.csd.background button.text-button.suggested-action:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+.content list button.suggested-action:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+.content list > row:not(:selected):hover button.suggested-action:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+list.content button.suggested-action:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+list.content > row:not(:selected):hover button.suggested-action:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+list.view.frame button.suggested-action:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+list.view.frame > row:not(:selected):hover button.suggested-action:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+popover.background button.suggested-action:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+headerbar.selection-mode button:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+.titlebar.selection-mode button:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+headerbar > .stack-switcher.linked > button.suggested-action:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+.titlebar .linked.raised button.suggested-action:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+.titlebar .linked button.suggested-action:backdrop:not(:only-child) {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+.titlebar > .stack-switcher.linked > button.suggested-action:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+.titlebar .linked entry ~ .suggested-action.image-button:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.9);
+}
+headerbar viewswitcher button.suggested-action.radio:backdrop:checked {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,alpha(@accent_bg_color,0.5),0.7);
+}
+.titlebar viewswitcher button.suggested-action.radio:backdrop:checked {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,alpha(@accent_bg_color,0.5),0.7);
+}
+messagedialog.csd.background button.text-button.destructive-action:backdrop {
+  color: @destructive_color;
+}
+.content list button.destructive-action:backdrop {
+  color: @destructive_color;
+}
+.content list > row:not(:selected):hover button.destructive-action:backdrop {
+  color: @destructive_color;
+}
+list.content button.destructive-action:backdrop {
+  color: @destructive_color;
+}
+list.content > row:not(:selected):hover button.destructive-action:backdrop {
+  color: @destructive_color;
+}
+list.view.frame button.destructive-action:backdrop {
+  color: @destructive_color;
+}
+list.view.frame > row:not(:selected):hover button.destructive-action:backdrop {
+  color: @destructive_color;
+}
+popover.background button.destructive-action:backdrop {
+  color: @destructive_color;
+}
+headerbar > .stack-switcher.linked > button.destructive-action:backdrop {
+  color: @destructive_color;
+}
+.titlebar .linked.raised button.destructive-action:backdrop {
+  color: @destructive_color;
+}
+.titlebar .linked button.destructive-action:backdrop:not(:only-child) {
+  color: @destructive_color;
+}
+.titlebar > .stack-switcher.linked > button.destructive-action:backdrop {
+  color: @destructive_color;
+}
+.titlebar .linked entry ~ .destructive-action.image-button:backdrop {
+  color: @destructive_color;
+}
+headerbar viewswitcher button.destructive-action.radio:backdrop:checked {
+  color: @destructive_color;
+  background-color: mix(@destructive_color,alpha(currentColor,0.35),0.7);
+}
+.titlebar viewswitcher button.destructive-action.radio:backdrop:checked {
+  color: @destructive_color;
+  background-color: mix(@destructive_color,alpha(currentColor,0.35),0.7);
+}
+button:link > label:backdrop {
+  color: @accent_color;
+}
+button:visited > label:backdrop {
+  color: @accent_color;
+}
+button:backdrop:visited {
+  color: mix(@accent_color,@view_fg_color,0.2);
+}
+*:link:backdrop:backdrop:hover {
+  color: mix(white,@accent_color,0.9);
+}
+*:link:backdrop {
+  color: @accent_color;
+}
+.osd spinbutton:not(.vertical) button:backdrop {
+  border-color: alpha(rgba(0, 0, 0, 0.9),0.7);
+}
+.osd spinbutton.vertical button:first-child:backdrop {
+  color: white;
+  background-color: rgba(0, 0, 0, 0.65);
+}
+.selection-mode .titlebar:not(headerbar) button:backdrop {
+  color: @accent_fg_color;
+}
+.selection-mode.titlebar:not(headerbar) button:backdrop {
+  color: @accent_fg_color;
+}
+.selection-mode headerbar button:backdrop.flat {
+  background-color: transparent;
+}
+.selection-mode headerbar button:backdrop {
+  color: @accent_fg_color;
+}
+headerbar.selection-mode button:backdrop.flat {
+  background-color: transparent;
+}
+headerbar.selection-mode button:backdrop {
+  color: @accent_fg_color;
+}
+.selection-mode .titlebar:not(headerbar) button:backdrop:active {
+  color: @accent_fg_color;
+}
+.selection-mode .titlebar:not(headerbar) button:backdrop:checked {
+  color: @accent_fg_color;
+}
+.selection-mode.titlebar:not(headerbar) button:backdrop:active {
+  color: @accent_fg_color;
+}
+.selection-mode.titlebar:not(headerbar) button:backdrop:checked {
+  color: @accent_fg_color;
+}
+.selection-mode headerbar button:backdrop:active {
+  color: @accent_fg_color;
+}
+.selection-mode headerbar button:backdrop:checked {
+  color: @accent_fg_color;
+}
+headerbar.selection-mode button:backdrop:active {
+  color: @accent_fg_color;
+}
+headerbar.selection-mode button:backdrop:checked {
+  color: @accent_fg_color;
+}
+.selection-mode .titlebar:not(headerbar) button:backdrop:active:hover {
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.65);
+}
+.selection-mode .titlebar:not(headerbar) button:backdrop:checked:hover {
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.65);
+}
+.selection-mode.titlebar:not(headerbar) button:backdrop:active:hover {
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.65);
+}
+.selection-mode.titlebar:not(headerbar) button:backdrop:checked:hover {
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.65);
+}
+.selection-mode headerbar button:backdrop:active:hover {
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.65);
+}
+.selection-mode headerbar button:backdrop:checked:hover {
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.65);
+}
+headerbar.selection-mode button:backdrop:active:hover {
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.65);
+}
+headerbar.selection-mode button:backdrop:checked:hover {
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.65);
+}
+.selection-mode .titlebar:not(headerbar) button.suggested-action:backdrop {
+  color: @window_fg_color;
+}
+.selection-mode.titlebar:not(headerbar) button.suggested-action:backdrop {
+  color: @window_fg_color;
+}
+.selection-mode headerbar button.suggested-action:backdrop {
+  color: @window_fg_color;
+}
+headerbar.selection-mode button.suggested-action:backdrop {
+  color: @window_fg_color;
+}
+.titlebar:not(headerbar) separator:backdrop {
+  background-color: alpha(currentColor,0.15);
+}
+headerbar:not(.selection-mode):backdrop {
+  color: @headerbar_fg_color;
+}
+headerbar:not(.selection-mode) entry:backdrop {
+  color: @headerbar_fg_color;
+}
+.titlebar:not(.selection-mode):backdrop {
+  color: @headerbar_fg_color;
+}
+.titlebar:not(.selection-mode) entry:backdrop {
+  color: @headerbar_fg_color;
+}
+headerbar:not(.selection-mode) button:not(.suggested-action):not(.destructive-action):backdrop {
+  color: @headerbar_fg_color;
+}
+.titlebar:not(.selection-mode) button:not(.suggested-action):not(.destructive-action):backdrop {
+  color: @headerbar_fg_color;
+}
+headerbar.selection-mode button:hover:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.85);
+}
+.titlebar.selection-mode button:hover:backdrop {
+  color: @accent_fg_color;
+  background-color: mix(@accent_fg_color,@accent_bg_color,0.85);
+}
+.titlebar entry:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.9);
+}
+.titlebar entry image:backdrop {
+  color: mix(@window_fg_color,@view_bg_color,0.2);
+}
+.default-decoration .title:backdrop {
+  color: @headerbar_fg_color;
+}
+headerbar > .stack-switcher.linked > button:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.9);
+}
+.titlebar .linked.raised button:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.9);
+}
+.titlebar .linked button:backdrop:not(:only-child) {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.9);
+}
+.titlebar > .stack-switcher.linked > button:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.9);
+}
+.titlebar .linked entry ~ .image-button:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.9);
+}
+headerbar > .stack-switcher.linked > button:hover:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.85);
+}
+.titlebar .linked.raised button:hover:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.85);
+}
+.titlebar .linked button:hover:backdrop:not(:only-child) {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.85);
+}
+.titlebar > .stack-switcher.linked > button:hover:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.85);
+}
+.titlebar .linked entry ~ .image-button:hover:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.85);
+}
+headerbar > .stack-switcher.linked > button:active:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked.raised button:active:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked button:active:backdrop:not(:only-child) {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar > .stack-switcher.linked > button:active:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked entry ~ .image-button:active:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+headerbar > .stack-switcher.linked > button:checked:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked.raised button:checked:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked button:checked:backdrop:not(:only-child) {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar > .stack-switcher.linked > button:checked:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked entry ~ .image-button:checked:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+headerbar > .stack-switcher.linked > button:active:backdrop:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked.raised button:active:backdrop:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked button:active:backdrop:hover:not(:only-child) {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar > .stack-switcher.linked > button:active:backdrop:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked entry ~ .image-button:active:backdrop:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+headerbar > .stack-switcher.linked > button:checked:backdrop:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked.raised button:checked:backdrop:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked button:checked:backdrop:hover:not(:only-child) {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar > .stack-switcher.linked > button:checked:backdrop:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked entry ~ .image-button:checked:backdrop:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+headerbar > .stack-switcher.linked > button:active:backdrop:hover {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked.raised button:active:backdrop:hover {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked button:active:backdrop:hover:not(:only-child) {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar > .stack-switcher.linked > button:active:backdrop:hover {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked entry ~ .image-button:active:backdrop:hover {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+headerbar > .stack-switcher.linked > button:checked:backdrop:hover {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked.raised button:checked:backdrop:hover {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked button:checked:backdrop:hover:not(:only-child) {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar > .stack-switcher.linked > button:checked:backdrop:hover {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar .linked entry ~ .image-button:checked:backdrop:hover {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+headerbar > .stack-switcher.linked > button:active:backdrop:hover:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.65);
+}
+.titlebar .linked.raised button:active:backdrop:hover:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.65);
+}
+.titlebar .linked button:active:backdrop:hover:hover:not(:only-child) {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.65);
+}
+.titlebar > .stack-switcher.linked > button:active:backdrop:hover:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.65);
+}
+.titlebar .linked entry ~ .image-button:active:backdrop:hover:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.65);
+}
+headerbar > .stack-switcher.linked > button:checked:backdrop:hover:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.65);
+}
+.titlebar .linked.raised button:checked:backdrop:hover:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.65);
+}
+.titlebar .linked button:checked:backdrop:hover:hover:not(:only-child) {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.65);
+}
+.titlebar > .stack-switcher.linked > button:checked:backdrop:hover:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.65);
+}
+.titlebar .linked entry ~ .image-button:checked:backdrop:hover:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.65);
+}
+headerbar viewswitcher button.radio:hover:backdrop:checked {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.9);
+}
+.titlebar viewswitcher button.radio:hover:backdrop:checked {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.9);
+}
+headerbar viewswitcher button.radio:checked:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar viewswitcher button.radio:checked:backdrop {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+headerbar viewswitcher button.radio:checked:backdrop:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar viewswitcher button.radio:checked:backdrop:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+headerbar viewswitcher button.radio:checked:backdrop:hover {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+.titlebar viewswitcher button.radio:checked:backdrop:hover {
+  color: @headerbar_fg_color;
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.7);
+}
+headerbar viewswitcher button.radio:checked:backdrop:hover:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.65);
+}
+.titlebar viewswitcher button.radio:checked:backdrop:hover:hover {
+  background-color: mix(@headerbar_fg_color,@headerbar_bg_color,0.65);
+}
+treeview.view.progressbar:backdrop {
+  background-image: image(@accent_bg_color);
+}
+.view.content-view.check:backdrop:not(list) {
+  background-color: @accent_bg_color;
+}
+.content-view:not(list) check:backdrop {
+  background-color: @accent_bg_color;
+}
+.view.content-view.check:backdrop:checked:not(list) {
+  color: rgba(255, 255, 255, 0.9);
+  background-color: @accent_bg_color;
+}
+.content-view:not(list) check:backdrop:checked {
+  color: rgba(255, 255, 255, 0.9);
+  background-color: @accent_bg_color;
+}
+.osd check:backdrop {
+  color: white;
+  background-color: rgba(0, 0, 0, 0.65);
+}
+.osd radio:backdrop {
+  color: white;
+  background-color: rgba(0, 0, 0, 0.65);
+}
+scale.horizontal.marks-before:not(.marks-after) slider:backdrop {
+  background-image: -gtk-scaled(url("assets/slider-horz-scale-has-marks-above-dark.png"), url("assets/slider-horz-scale-has-marks-above-dark@2.png"));
+}
+scale.horizontal.marks-before:not(.marks-after) slider:backdrop:hover {
+  background-image: -gtk-scaled(url("assets/slider-horz-scale-has-marks-above-dark.png"), url("assets/slider-horz-scale-has-marks-above-dark@2.png"));
+}
+scale.horizontal.marks-after:not(.marks-before) slider:backdrop {
+  background-image: -gtk-scaled(url("assets/slider-horz-scale-has-marks-below-dark.png"), url("assets/slider-horz-scale-has-marks-below-dark@2.png"));
+}
+scale.horizontal.marks-after:not(.marks-before) slider:backdrop:hover {
+  background-image: -gtk-scaled(url("assets/slider-horz-scale-has-marks-below-dark.png"), url("assets/slider-horz-scale-has-marks-below-dark@2.png"));
+}
+scale.vertical.marks-before:not(.marks-after) slider:backdrop {
+  background-image: -gtk-scaled(url("assets/slider-vert-scale-has-marks-above-dark.png"), url("assets/slider-vert-scale-has-marks-above-dark@2.png"));
+}
+scale.vertical.marks-before:not(.marks-after) slider:backdrop:hover {
+  background-image: -gtk-scaled(url("assets/slider-vert-scale-has-marks-above-dark.png"), url("assets/slider-vert-scale-has-marks-above-dark@2.png"));
+}
+scale.vertical.marks-after:not(.marks-before) slider:backdrop {
+  background-image: -gtk-scaled(url("assets/slider-vert-scale-has-marks-below-dark.png"), url("assets/slider-vert-scale-has-marks-below-dark@2.png"));
+}
+scale.vertical.marks-after:not(.marks-before) slider:backdrop:hover {
+  background-image: -gtk-scaled(url("assets/slider-vert-scale-has-marks-below-dark.png"), url("assets/slider-vert-scale-has-marks-below-dark@2.png"));
+}
+levelbar trough:backdrop {
+  background-color: alpha(currentColor,0.15);
+}
+levelbar block.empty:backdrop {
+  border-color: alpha(@window_fg_color,0.1);
+}
+printdialog paper:backdrop {
+  color: @window_fg_color;
+}
+scrolledwindow overshoot.top:backdrop {
+  background-image: -gtk-gradient(radial, center top, 0, center top, 0.5, to(@window_fg_color), to(alpha(@window_fg_color,0))), -gtk-gradient(radial, center top, 0, center top, 0.6, from(alpha(@window_fg_color,0.07)), to(alpha(@window_fg_color,0)));
+}
+scrolledwindow overshoot.bottom:backdrop {
+  background-image: -gtk-gradient(radial, center bottom, 0, center bottom, 0.5, to(@window_fg_color), to(alpha(@window_fg_color,0))), -gtk-gradient(radial, center bottom, 0, center bottom, 0.6, from(alpha(@window_fg_color,0.07)), to(alpha(@window_fg_color,0)));
+}
+scrolledwindow overshoot.left:backdrop {
+  background-image: -gtk-gradient(radial, left center, 0, left center, 0.5, to(@window_fg_color), to(alpha(@window_fg_color,0))), -gtk-gradient(radial, left center, 0, left center, 0.6, from(alpha(@window_fg_color,0.07)), to(alpha(@window_fg_color,0)));
+}
+scrolledwindow overshoot.right:backdrop {
+  background-image: -gtk-gradient(radial, right center, 0, right center, 0.5, to(@window_fg_color), to(alpha(@window_fg_color,0))), -gtk-gradient(radial, right center, 0, right center, 0.6, from(alpha(@window_fg_color,0.07)), to(alpha(@window_fg_color,0)));
+}
+row.activatable:backdrop:hover {
+  background-color: alpha(currentColor,0.07);
+}
+.app-notification:backdrop {
+  background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.2), transparent 2px);
+}
+.app-notification.frame:backdrop {
+  background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.2), transparent 2px);
+}
+calendar.button:backdrop {
+  color: @view_fg_color;
+}
+calendar.highlight:backdrop {
+  color: alpha(@window_fg_color,0.5);
+}
+calendar:backdrop {
+  color: @view_fg_color;
+}
+messagedialog.csd.background button:backdrop {
+  color: white;
+}
+.sidebar:backdrop {
+  background-color: @sidebar_bg_color;
+}
+placessidebar row:backdrop:selected {
+  color: @accent_fg_color;
+}
+paned > separator:backdrop {
+  background-image: image(mix(currentColor,@window_bg_color,0.85));
+}
+paned > separator.wide:backdrop {
+  background-image: image(mix(currentColor,@window_bg_color,0.85)), image(mix(currentColor,@window_bg_color,0.85));
+}
+infobar.info > revealer > box:backdrop {
+  color: @window_fg_color;
+}
+infobar.question > revealer > box:backdrop {
+  color: @window_fg_color;
+}
+infobar.warning > revealer > box:backdrop {
+  color: @window_fg_color;
+}
+infobar.error > revealer > box:backdrop {
+  color: @window_fg_color;
+}
+.keycap:backdrop {
+  color: @window_fg_color;
+  background-color: @view_bg_color;
+}
+tabbar .start-action:backdrop {
+  background-color: @headerbar_bg_color;
+}
+tabbar .end-action:backdrop {
+  background-color: @headerbar_bg_color;
+}
+.terminal:backdrop {
+  background-color: #3d3846;
+}
+.terminal text:backdrop {
+  background-color: #3d3846;
+}
+.org-gnome-gedit notebook > header:backdrop {
+  background-color: @headerbar_bg_color;
+}
+.gedit-side-panel-paned notebook > header:backdrop {
+  background-color: @headerbar_bg_color;
+}
+.geary-main-window leaflet > leaflet > box:first-child:backdrop {
+  background-color: @sidebar_bg_color;
+}
+.geary-main-window leaflet > box:first-child > .titlebar:backdrop {
+  background-color: @sidebar_bg_color;
+}
+/* KNOMADIC: gtk-inactive END */
+
+/* KNOMADIC: flat-surfaces BEGIN - do not edit by hand, see set-flat-surfaces.sh */
+@define-color borders transparent;
+@define-color unfocused_borders transparent;
+@define-color headerbar_border_color transparent;
+@define-color headerbar_shade_color transparent;
+@define-color headerbar_darker_shade_color transparent;
+@define-color sidebar_shade_color transparent;
+@define-color sidebar_border_color transparent;
+@define-color card_shade_color transparent;
+@define-color popover_shade_color transparent;
+@define-color shade_color transparent;
+button,
+entry,
+spinbutton,
+spinbutton > button,
+combobox,
+dropdown,
+frame,
+frame > border,
+.frame,
+scrolledwindow,
+viewport,
+notebook,
+notebook > header,
+notebook > header > tabs > tab,
+treeview.view,
+list,
+row,
+toolbar,
+menubar,
+statusbar,
+popover > contents,
+popover.background > contents,
+menu,
+menuitem,
+switch,
+scale trough,
+progressbar trough,
+levelbar trough,
+checkbutton check,
+radiobutton radio,
+columnview,
+treeview header button,
+tooltip,
+window.dialog,
+messagedialog,
+filechooser,
+placessidebar,
+.card,
+.boxed-list,
+searchbar,
+actionbar,
+infobar,
+textview,
+textview > text {
+  border-color: transparent;
+  box-shadow: none;
+}
+separator,
+paned > separator,
+popover separator,
+menu separator,
+headerbar separator,
+toolbar separator,
+list > separator,
+treeview.view separator {
+  background-color: transparent;
+  background-image: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+/* unchecked check/radio boxes are drawn ONLY by their border: without it they vanish, so give them a fill (colour does the work) */
+check:not(:checked):not(:indeterminate),
+radio:not(:checked):not(:indeterminate),
+checkbutton check:not(:checked):not(:indeterminate),
+radiobutton radio:not(:checked):not(:indeterminate) {
+  background-color: alpha(currentColor, 0.18);
+  background-image: none;
+}
+/* row hover (libadwaita/adw-gtk3 use only 4-10% of the text colour): with the lines gone, colour must carry it */
+listview > row:hover:not(:selected),
+list > row:hover:not(:selected),
+row.activatable:hover:not(:selected),
+columnview row:hover:not(:selected),
+.navigation-sidebar > row:hover:not(:selected),
+gridview > child:hover:not(:selected),
+flowbox > flowboxchild:hover:not(:selected) {
+  background-color: alpha(currentColor, 0.14);
+}
+/* rounded window corners clip the bottom row of GTK3 windows (VeraCrypt, Xarchiver...): keep content clear of them */
+window.background:not(.popup):not(.tooltip) > box,
+window.background:not(.popup):not(.tooltip) > grid,
+window.background:not(.popup):not(.tooltip) > paned,
+window.background:not(.popup):not(.tooltip) > overlay,
+window.background:not(.popup):not(.tooltip) > stack,
+window.background:not(.popup):not(.tooltip) > notebook,
+window.background:not(.popup):not(.tooltip) > alignment,
+window.background:not(.popup):not(.tooltip) > fixed {
+  padding-bottom: 10px;
+}
+/* KNOMADIC: flat-surfaces END */

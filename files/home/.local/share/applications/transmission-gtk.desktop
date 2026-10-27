@@ -244,7 +244,7 @@ Keywords[uk]=torrents;downloading;uploading;share;sharing;
 Keywords[zh_CN]=torrents;downloading;uploading;share;sharing;种子;下载;上传;分享;共享;
 Keywords[zh_TW]=torrents;正在下載;正在上傳;分享;分享中;
 Keywords=torrents;downloading;uploading;share;sharing;
-Exec=transmission-gtk %U
+Exec=transmission-fm %U
 Icon=uget.svg
 Terminal=false
 TryExec=transmission-gtk
@@ -294,7 +294,7 @@ Name[uk]=Запустити Transmission з призупинкою усіх то
 Name[zh_CN]=启动 Transmission 时暂停全部任务
 Name[zh_TW]=啟動 Transmission 時暫停所有 Torrents
 Name=Start Transmission with All Torrents Paused
-Exec=transmission-gtk --paused
+Exec=transmission-fm --paused
 
 [Desktop Action Minimize]
 Name[be]=Запусціць Transmission у згорнутым выглядзе
@@ -335,4 +335,4 @@ Name[uk]=Запустити Transmission згорнутим
 Name[zh_CN]=启动 Transmission 时最小化
 Name[zh_TW]=啟動 Transmission 時最小化
 Name=Start Transmission Minimized
-Exec=transmission-gtk --minimized
+Exec=transmission-fm --minimized

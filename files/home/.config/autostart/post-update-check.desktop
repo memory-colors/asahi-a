@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Post-update theme check
+Exec=/home/blank/.themes/machine-setup/post-update-check.sh --login
+NoDisplay=true

@@ -37,7 +37,6 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { WindowPreview } from 'resource:///org/gnome/shell/ui/windowPreview.js';
 import { WorkspacesView } from 'resource:///org/gnome/shell/ui/workspacesView.js';
 import { TopBar } from './topbar/topbar.js';
-import { WindowGap } from './gap/gap.js';
 import { ThemeManager } from './theme/theme.js';
 import { QuickSettingsLayout } from './qs/quickSettings.js';
 import { PopupDismiss } from './popup/popupDismiss.js';
@@ -106,8 +105,8 @@ function buildConfig() {
             getD('border-blue'),
             getD('border-alpha'),
         ],
-        keepRoundedMaximized:  getB('keep-rounded-maximized'),
-        keepRoundedFullscreen: getB('keep-rounded-fullscreen'),
+        keepRoundedMaximized:  false,   // hard-coded off (the Behaviour switches were removed 2026-10-24)
+        keepRoundedFullscreen: false,
     };
 }
 
@@ -907,7 +906,7 @@ export default class RoundedWindowCornersExtension extends Extension {
         }
         this.#startRefocus();
         this.#startTopBar();
-        this.#startGap();
+        this.#startTiling();
         this.#startPopupDismiss();
         this.#startOverviewTweaks();
         this.#startQsLayout();
@@ -936,27 +935,51 @@ export default class RoundedWindowCornersExtension extends Extension {
         this.#theme = null;
     }
 
-    // ── Window Gap (see gap/) ──
-    #gap = null;
+    // ── Quarter tiling: Tiling Assistant folded in (see tiling/NOTICE.md). Loaded with a dynamic import inside try/catch so that a
+    //    shell API change on a GNOME upgrade can only disable tiling, never Knomadic itself. ──
+    #tiling = null;
+    #tilingToken = 0;
+    #tilingSig = 0;
+    #tilingCss = null;
 
-    #startGap() {
-        try {
-            this.#gap = new WindowGap(_settings);
-            this.#gap.enable();
-        } catch (e) {
-            console.error(`Knomadic Window Gap failed to start: ${e}`);
-            try { this.#gap?.disable(); } catch (e2) { /* ignore */ }
-            this.#gap = null;
-        }
+    #startTiling() {
+        if (!this.#tilingSig)   // the prefs switch starts/stops it live
+            this.#tilingSig = _settings.connect('changed::quarter-tiling', () => { this.#stopTiling(); this.#startTiling(); });
+        if (!_settings.get_boolean('quarter-tiling')) return;
+        const token = ++this.#tilingToken;
+        const dir = Gio.File.new_for_path(GLib.build_filenamev([this.path, 'tiling']));
+        import('./tiling/extension.js').then(async mod => {
+            if (token !== this.#tilingToken) return;   // disabled again while loading
+            const ta = new mod.default({
+                'uuid': 'tiling-assistant@leleat-on-github', 'name': 'Tiling Assistant (in Knomadic)', 'version': 56,
+                'settings-schema': 'org.gnome.shell.extensions.tiling-assistant', 'dir': dir, 'path': dir.get_path(),
+            });
+            this.#tiling = ta;
+            try {   // upstream's stylesheet.css (popup / focus hint / layout picker styles), which a normal extension gets loaded automatically
+                this.#tilingCss = Gio.File.new_for_path(GLib.build_filenamev([dir.get_path(), 'stylesheet.css']));
+                St.ThemeContext.get_for_stage(global.stage).get_theme().load_stylesheet(this.#tilingCss);
+            } catch (e) { console.error(`Knomadic tiling stylesheet: ${e}`); this.#tilingCss = null; }
+            await ta.enable();
+        }).catch(e => {
+            console.error(`Knomadic quarter tiling failed to start: ${e}`);
+            try { this.#tiling?.disable(); } catch (e2) { /* ignore */ }
+            this.#tiling = null;
+        });
     }
 
-    #stopGap() {
+    #stopTiling(final = false) {
+        this.#tilingToken++;
+        if (final && this.#tilingSig) { _settings.disconnect(this.#tilingSig); this.#tilingSig = 0; }
         try {
-            this.#gap?.disable();
+            this.#tiling?.disable();
         } catch (e) {
-            console.error(`Knomadic Window Gap failed to stop cleanly: ${e}`);
+            console.error(`Knomadic quarter tiling failed to stop cleanly: ${e}`);
         }
-        this.#gap = null;
+        this.#tiling = null;
+        if (this.#tilingCss) {
+            try { St.ThemeContext.get_for_stage(global.stage).get_theme().unload_stylesheet(this.#tilingCss); } catch (e) { /* ignore */ }
+            this.#tilingCss = null;
+        }
     }
 
     // ── Click-outside dismissal of the file-manager prompts (see popup/popupDismiss.js) ──
@@ -1225,9 +1248,22 @@ export default class RoundedWindowCornersExtension extends Extension {
         const boxes = () => this.#topBar
             ? [Main.layoutManager.panelBox]
             : [];
+        // A non-reactive parent does not stop its REACTIVE children from being picked, so the invisible bar's buttons (calendar, quick
+        // settings) still caught clicks meant for the workspace thumbnails under it. Switch every reactive actor of the bar off while
+        // the Overview is open and remember which ones to switch back on.
+        const offActors = new Set();
+        const inputOff = a => {
+            if (a.reactive) { offActors.add(a); a.reactive = false; }
+            for (const c of a.get_children()) inputOff(c);
+        };
+        const inputOn = () => {
+            for (const a of offActors) { try { a.reactive = true; } catch (e) { /* destroyed meanwhile */ } }
+            offActors.clear();
+        };
         const fade = (opacity, reactive) => boxes().forEach(b => {
             logDbg(`OVERVIEW top-bar fade to ${opacity} on ${b}`);
             b.remove_transition('opacity');
+            if (reactive) inputOn(); else inputOff(b);
             b.reactive = reactive;
             b.ease({ opacity, duration: 200, mode: Clutter.AnimationMode.EASE_OUT_QUAD });
         });
@@ -1253,6 +1289,7 @@ export default class RoundedWindowCornersExtension extends Extension {
         this.#layoutPatches.push(() => {
             ids.forEach(i => Main.overview.disconnect(i));
             watch.forEach(([b, id]) => b.disconnect(id));
+            inputOn();
             boxes().forEach(b => { b.remove_transition('opacity'); b.opacity = 255; b.reactive = true; });
         });
     }
@@ -1460,7 +1497,7 @@ export default class RoundedWindowCornersExtension extends Extension {
 
         this.#stopQsLayout();
         this.#stopOverviewTweaks();
-        this.#stopGap();
+        this.#stopTiling(true);
         this.#stopPopupDismiss();
         this.#stopTheme();
         this.#stopTopBar();
