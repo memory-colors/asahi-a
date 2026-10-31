@@ -45,7 +45,7 @@ done
 #   GitHub  (publish step 2): installer + lists.txt + files/system (system files) + files/dconf-user.ini + files/Software/asahi_atomic.
 #                             No home files: they come back from the archive.
 # ---------------------------------------------------------------------------------------------------------------
-ARCHIVE_EXCLUDES=(Downloads Screenshots .index .cache .local/share/Trash
+ARCHIVE_EXCLUDES=(Downloads Screenshots Screencasts Pictures Photo Video Music Audio Movies .index .cache .local/share/Trash
     Software/asahi-a Software/czkawka-gui .local/share/LosslessCut            # last three: re-created by the repo / apps phase
     .config/Claude/claude-code .config/Claude/Cache ".config/Claude/Code Cache" .config/Claude/GPUCache
     .config/Claude/DawnGraphiteCache .config/Claude/DawnWebGPUCache)           # Claude Desktop caches
@@ -385,7 +385,7 @@ GitHub:  https://github.com/memory-colors/asahi-a  (commit ${COMMIT:-?})
 Not automated (do by hand if wanted): bleachbit locale cleanup; dracut/plymouth initramfs rebuild; bootloader / m1n1;
 Claude Code install:  curl -fsSL https://claude.ai/install.sh | bash   (as $TARGET_USER)
 
-Not in the archive: ~/Downloads, ~/Screenshots, ~/.index, caches, Trash, LosslessCut and czkawka-gui (the "apps" phase downloads those).
+Not in the archive: ~/Downloads, ~/Screenshots, ~/Screencasts, ~/Pictures, ~/Photo, ~/Video, ~/Music, ~/Audio, ~/Movies, ~/.index, caches, Trash, LosslessCut and czkawka-gui (the "apps" phase downloads those).
 TXT
     echo "Wrote $out"
     [ $DRY -eq 1 ] && cat "$out"
