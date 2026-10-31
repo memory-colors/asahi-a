@@ -1,4 +1,0 @@
-#!/bin/sh
-# idempotently (re)insert minimal.css into the user GTK4 css
-G=$HOME/.config/gtk-4.0/gtk.css; D=$(dirname "$0")
-sed -i '/PTYXIS-MINIMAL START/,/PTYXIS-MINIMAL END/d' "$G"; cat "$D/minimal.css" >> "$G"; echo done

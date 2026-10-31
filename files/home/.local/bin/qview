@@ -1,4 +1,0 @@
-#!/bin/sh
-# qView: same Qt look as SMPlayer (qt-fm shim + qt-general.qss). Real binary: /usr/bin/qview.
-exec env QT_STYLE_OVERRIDE=Fusion LD_PRELOAD="$HOME/.themes/qt-fm/libqt-fm.so:$HOME/.themes/qt-noicons/libqt-noicons.so" \
-  /usr/bin/qview -stylesheet "$HOME/.themes/qt-fm/qt-general.qss" "$@"

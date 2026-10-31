@@ -1,6 +1,0 @@
-#!/bin/bash
-# Opens Thunar's bulk renamer on the given files, then tiles it to the right half via GNOME's tile-right keybinding (simulated with ydotool, same trick as the smplayer wrapper).
-# Key sequence = GNOME's CURRENT toggle-tiled-right: check `gsettings get org.gnome.mutter.keybindings toggle-tiled-right` if this stops working.
-thunar --bulk-rename "$@"
-sleep 0.8
-YDOTOOL_SOCKET=/tmp/.ydotool_socket ydotool key 56:1 125:1 106:1 106:0 125:0 56:0 2>/dev/null || true

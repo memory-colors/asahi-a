@@ -1,18 +1,18 @@
 #!/bin/bash
-# rebuild.sh - recreate the "A" system (Fedora Asahi Remix 44 GNOME-ish) on top of a stock Remix 44 MINIMAL install.
+# rebuild.sh - recreate the "A" system (Fedora Asahi Remix 44 GNOME-ish) on top of a stock Remix 44 MINIMAL install,
+#              and (publish) back the current system up for exactly that.
 #
-#   sudo ./rebuild.sh [phase ...] [--archive FILE.tar.zst] [--dry-run]
-#   sudo ./rebuild.sh make-archive DIR              (run on the SOURCE system: writes asahi-a-archive-private_<date>.tar.zst AND
-#                                                    asahi-home-full_<date>.tar.zst into DIR; the date is added automatically)
-#   ./rebuild.sh sync-repo                          (run on the SOURCE system as the normal user: live system -> this repo; never commits)
+#   sudo ./rebuild.sh [phase ...] [--archive FILE.tar.zst] [--dry-run]       restore, on a fresh Minimal install
+#   ./rebuild.sh publish [--dry-run]                                          backup, on the source system (run as the normal user)
 #
+# publish = 1 home archive -> external drive (verified)  2 installer files -> GitHub (asks first)  3 cleanup  4 restore README
 # Phases (default = all, in this order; each one asks before it runs):
 #   repos     rpm macro (no extra locales), RPM Fusion release, custom .repo files
 #   packages  dnf install [install] list, then dnf remove [remove] list (capability-checked first)
-#   files     system files (/etc, /usr, /var), home dotfiles/themes, dconf settings, SELinux relabel
+#   files     system files (/etc, /usr, /var), dconf settings, SELinux relabel
 #   services  enable / disable systemd units, default target
 #   apps      LosslessCut + czkawka-gui from GitHub releases
-#   archive   (only with --archive FILE) unpack the private archive (secrets, personal data, modified icon themes, SF fonts)
+#   archive   find <date>_asahi_home_full.tar.zst on a drive, unpack it (home, keys, Wi-Fi, icon themes, SF fonts)
 #   verify    compare installed packages and units against the recorded system (read-only)
 #
 # Design rules (user policy): NO dnf -y (dnf shows its own prompts, so you review every package list),
@@ -22,82 +22,35 @@ REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 LISTS=$REPO_DIR/lists.txt
 TARGET_USER=blank          # paths in the saved configs (gdm autologin, symlinks, .desktop files) assume this
 TARGET_HOME=/home/$TARGET_USER
-DRY=0; ARCHIVE=""; PHASES=(); MAKE_SET=""; MAKE=""; SYNC=0
+MEDIA_ROOT=${MEDIA_ROOT:-/run/media/$TARGET_USER}     # where external drives are mounted (override for tests)
+TTY_IN=${TTY_IN:-/dev/tty}                            # where prompts read from (override for tests)
+DRY=0; ARCHIVE=""; PHASES=(); PUBLISH=0
 
 while [ $# -gt 0 ]; do
     case $1 in
         --dry-run) DRY=1 ;;
         --archive) ARCHIVE=${2:-}; shift ;;
-        make-archive) MAKE_SET=1; MAKE=${2:-}; shift ;;
-        sync-repo) SYNC=1 ;;
-        -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+        publish) PUBLISH=1 ;;
+        -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
         *) PHASES+=("$1") ;;
     esac
     shift
 done
-[ ${#PHASES[@]} -eq 0 ] && PHASES=(repos packages files services apps verify)
+[ ${#PHASES[@]} -eq 0 ] && PHASES=(repos packages files services apps archive verify)
 [ -n "$ARCHIVE" ] && [[ " ${PHASES[*]} " != *" archive "* ]] && PHASES+=(archive)
 
 # ---------------------------------------------------------------------------------------------------------------
-# CLASSIFICATION - the one list shared by `make-archive` and `sync-repo`. Paths are relative to $TARGET_HOME.
-#   PUBLIC_*   copied into this (public) repo under files/home/ by sync-repo. NEVER put anything secret here.
-#   PRIVATE_*  packed by make-archive (secrets, history, personal data).
-#   SKIP_*     neither (caches, runtime state, things downloaded/derived by rebuild.sh).
-# Anything else is picked up automatically (loose files in ~ and unpublished ~/Software items go to the archive)
-# or reported as UNCLASSIFIED (new top-level dirs in ~, ~/.config, ~/.local/share): add it to a list below.
+# WHAT GOES WHERE
+#   archive (publish step 1): ALL of $TARGET_HOME except ARCHIVE_EXCLUDES, plus the ARCHIVE_SYSTEM paths (root-only files).
+#   GitHub  (publish step 2): installer + lists.txt + files/system (system files) + files/dconf-user.ini + files/Software/asahi_atomic.
+#                             No home files: they come back from the archive.
 # ---------------------------------------------------------------------------------------------------------------
-PUBLIC_DIRS=(.bashrc.d .themes .local/bin
-    .local/share/applications .local/share/fonts .local/share/gnome-shell .local/share/icons .local/share/konsole
-    .config/{autostart,bleachbit,czkawka,dhruva@blank.local,environment.d,gtk-3.0,gtk-4.0,ibus,ksnip,menus,plasma-workspace}
-    .config/{qView,ristretto,smplayer,Thunar,VeraCrypt,viewnior,xdg-desktop-portal,xfce4}
-    .config/{fm-fonts,fm-tweaks,xarchiver} .local/share/org.gnome.Ptyxis)
-PUBLIC_FILES=(.bashrc
-    .config/{.gsd-keyboard.settings-ported,arkrc,baloofileinformationrc,dnfdragora.yaml,dnfui.conf,fm-menu-hide.txt,gnome-initial-setup-done}
-    .config/{kdeglobals,kglobalshortcutsrc,khotkeysrc,kiorc,konsole.kmessagebox,konsolerc,kservicemenurc,ktrashrc}
-    .config/{mimeapps.list,monitors.xml,qwhitesurgtkdecorations.conf,user-dirs.dirs,user-dirs.locale}
-    ".config/Mullvad VPN/gui_settings.json" .config/LosslessCut/config.json)
-PUBLIC_SOFTWARE=(asahi_atomic fm-tweaks "trust-desktop-files*" "Toggl_*" "lt_grey*")      # globs inside ~/Software; everything else there is PRIVATE
-SKIP_SOFTWARE=(czkawka-gui asahi-a)                             # downloaded by the apps phase
-# excluded from the rsync of PUBLIC_DIRS (patterns match at any depth): private, absolute symlinks are dropped by --safe-links
-SYNC_EXCLUDES=(.git original-upstream-extensions __pycache__ '*.bak*' '*.pyc' rEFInd-install.desktop view_properties extension-updates 'SF-*' claude losslesscut piccolo whitesur-src/build notifications application_state window-memory.json '*-unix-wayland-*')
-PRIVATE_PATHS=(.ssh .gnupg .claude Downloads Screenshots .local/opt .local/libexec
-    .local/share/keyrings .local/share/pki .local/share/evolution .local/share/applications/rEFInd-install.desktop
-    ".config/Mullvad VPN" .config/transmission .config/evolution .config/BraveSoftware .config/Claude .config/gh .config/piccolo .config/systemd .local/share/piccolo
-    .local/share/fonts/SF-Compact-static .local/share/fonts/SF-Pro-static)       # + loose files in ~ (except .bashrc, .index)
-PRIVATE_SYSTEM=(etc/NetworkManager/system-connections etc/mullvad-vpn var/lib/AccountsService/users/$TARGET_USER var/lib/AccountsService/icons/$TARGET_USER
+ARCHIVE_EXCLUDES=(Downloads Screenshots .index .cache .local/share/Trash
+    Software/asahi-a Software/czkawka-gui .local/share/LosslessCut            # last three: re-created by the repo / apps phase
+    .config/Claude/claude-code .config/Claude/Cache ".config/Claude/Code Cache" .config/Claude/GPUCache
+    .config/Claude/DawnGraphiteCache .config/Claude/DawnWebGPUCache)           # Claude Desktop caches
+ARCHIVE_SYSTEM=(etc/NetworkManager/system-connections etc/mullvad-vpn var/lib/AccountsService/users/$TARGET_USER var/lib/AccountsService/icons/$TARGET_USER
     usr/share/icons/{MacTahoe-nord,MacTahoe-nord-dark,WhiteSur-grey,Bibata-Modern-Ice,breeze_cursors})
-SKIP_PATHS=(.cache .var .index .local/state .config/{org.gnome.Ptyxis,tiling-assistant} .local/share/{containers,dbus-1} .config/fm-cfg .local/share/{ark,mutter,LosslessCut,claude,Trash,baloo,flatpak,folks,glib-2.0,gnome-settings-daemon,gnome-software}
-    .local/share/{gvfs-metadata,icc,kio,locale,metainfo,nautilus,org.gnome.TextEditor,recently-used.xbel,user-places.xbel}
-    .local/share/{backgrounds,color-schemes,desktop-directories,gtksourceview-5,kservices5,kxmlgui5,pixmaps,sounds}
-    .config/{dconf,enchant,goa-1.0,imsettings,mpv,pulse,LosslessCut} .local/bin/claude)
-# archive: the Claude Desktop caches are not worth packing
-FULL_EXCLUDES=(.cache .index .local/share/Trash)   # full home backup: everything else is included
-ARCHIVE_EXCLUDES=(.config/Claude/claude-code .config/Claude/Cache ".config/Claude/Code Cache" .config/Claude/GPUCache
-                  .config/Claude/DawnGraphiteCache .config/Claude/DawnWebGPUCache)
-
-classified() {   # classified REL: true if REL (or a path beneath it) appears in any list, or is a backup/cache artefact
-    local rel=$1 k
-    case $rel in *.bak*|*.tbcache|user-places.xbel.*) return 0 ;; esac
-    for k in "${PUBLIC_DIRS[@]}" "${PUBLIC_FILES[@]}" "${PRIVATE_PATHS[@]}" "${SKIP_PATHS[@]}"; do
-        [ "$rel" = "$k" ] || [[ $k == "$rel"/* ]] && return 0
-    done
-    return 1
-}
-unclassified_scan() {   # warn about new entries nobody has classified yet
-    local d e rel n=0
-    for d in "" .config .local .local/share; do
-        for e in "$TARGET_HOME/${d:+$d/}"* "$TARGET_HOME/${d:+$d/}".[!.]*; do
-            [ -e "$e" ] || [ -L "$e" ] || continue
-            rel=${e#"$TARGET_HOME"/}
-            [ -z "$d" ] && [ ! -d "$e" ] && continue          # loose files in ~ are auto-archived
-            [ -z "$d" ] && case $rel in .config|.local|Software) continue ;; esac
-            [ "$d" = .local ] && case $rel in .local/share) continue ;; esac   # .local/share is scanned one level down   # Software is classified per item (PUBLIC_SOFTWARE)
-            classified "$rel" || { warn "UNCLASSIFIED: ~/$rel  (add it to PUBLIC_*/PRIVATE_*/SKIP_* at the top of rebuild.sh)"; n=$((n+1)); }
-        done
-    done
-    [ $n -eq 0 ] && echo "No unclassified entries."
-    return 0
-}
 
 say()  { printf '\n\033[1m== %s ==\033[0m\n' "$*"; }
 warn() { printf '\033[33mWARN: %s\033[0m\n' "$*" >&2; }
@@ -106,12 +59,16 @@ run()  { if [ $DRY -eq 1 ]; then printf '[dry-run] %s\n' "$*"; else "$@"; fi; }
 as_user() { run runuser -u "$TARGET_USER" -- env HOME="$TARGET_HOME" "$@"; }
 # rsync flavours: never touch existing directory modes/owners (home is 700, /var/lib/gdm has its own modes)
 RS_SYS=(rsync -rltE --no-owner --no-group)
-RS_HOME=(rsync -rltE "--chown=$TARGET_USER:$TARGET_USER")
 section() { awk -v s="[$1]" '$0==s{f=1;next} /^\[/{f=0} f&&NF' "$LISTS"; }
 ask() {   # ask "question" ; reads from the terminal even when launched through a pipe
     [ $DRY -eq 1 ] && return 0
-    local a; read -r -p "$1 [y/N] " a < /dev/tty; [ "$a" = y ] || [ "$a" = Y ]
+    local a; read -r -p "$1 [y/N] " a < "$TTY_IN"; [ "$a" = y ] || [ "$a" = Y ]
 }
+confirm() {   # confirm "question" ; y/n, asks again on anything else; no input (EOF) counts as n. Also asks in --dry-run.
+    local a
+    while :; do read -r -p "$1 y/n: " a < "$TTY_IN" || return 1; case $a in y|Y) return 0 ;; n|N) return 1 ;; esac; done
+}
+pause() { local a; read -r -p "$1" a < "$TTY_IN" || die "no input available"; }
 
 preflight() {
     [ "$(id -u)" -eq 0 ] || [ $DRY -eq 1 ] || die "run as root: sudo ./rebuild.sh"
@@ -174,7 +131,7 @@ phase_packages() {
 
 phase_files() {
     say "files"
-    local H=$REPO_DIR/files/home S=$REPO_DIR/files/system A=$REPO_DIR/files/Software/asahi_atomic
+    local S=$REPO_DIR/files/system A=$REPO_DIR/files/Software/asahi_atomic
     # --- system files (everything under files/system mirrors /). The patched shell theme only fits the
     #     gnome-shell build it was generated from (50.5); on any other build keep the stock file.
     local excl=()
@@ -189,15 +146,9 @@ phase_files() {
     run install -D -m 0755 "$A/reboot-picker-helper" /usr/local/libexec/reboot-picker-helper
     run install -D -m 0440 "$A/reboot-picker-sudoers" /etc/sudoers.d/reboot-picker
     run visudo -cf /etc/sudoers.d/reboot-picker
-    # GDM single-user extension + adw-gtk3 copy for root GUI apps (pkexec) come from the home copies
-    run "${RS_SYS[@]}" "$H/.themes/machine-setup/gdm-single-user@blank.local/" "/usr/share/gnome-shell/extensions/gdm-single-user@blank.local/"
-    run "${RS_SYS[@]}" "$H/.themes/adw-gtk3-dark/" /usr/share/themes/adw-gtk3-dark/
     run dconf update
-    # --- home: dotfiles, themes, launchers, configs, fonts, ~/Software scripts (never --delete)
-    run "${RS_HOME[@]}" "$H"/ "$TARGET_HOME"/
-    run "${RS_HOME[@]}" "$REPO_DIR/files/Software"/ "$TARGET_HOME/Software"/
+    # --- home: comes back from the archive (archive phase); only the permissions are set here
     run chmod 700 "$TARGET_HOME"
-    as_user fc-cache -f
     # --- GNOME settings (text dump -> user dconf db, on a private bus since no session is running)
     [ -r "$REPO_DIR/files/dconf-user.ini" ] && as_user dbus-run-session -- sh -c "dconf load / < '$REPO_DIR/files/dconf-user.ini'"
     # --- SELinux labels for everything we dropped in
@@ -236,163 +187,281 @@ phase_apps() {
     as_user chmod +x "$TARGET_HOME/Software/czkawka-gui/czkawka_gui"
 }
 
-make_archive() {   # run on the source system; needs root for the root-only files
-    local out=$1 paths=() p f e k
-    [ -n "$out" ] || die "usage: rebuild.sh make-archive DIR   (an existing directory, e.g. the external drive)"
-    [ "$(id -u)" -eq 0 ] || [ $DRY -eq 1 ] || die "run as root (reads root-only files such as Wi-Fi profiles)"
-    [ -d "$out" ] || die "$out is not a directory"
-    local dir=${out%/} stamp; stamp=$(date +%F)
-    local priv=$dir/asahi-a-archive-private_$stamp.tar.zst full=$dir/asahi-home-full_$stamp.tar.zst
-    [ ! -e "$priv" ] || die "$priv already exists - refusing to overwrite (delete the old one first)"
-    [ ! -e "$full" ] || die "$full already exists - refusing to overwrite (delete the old one first)"
-    cd / || exit 1
-    local H=${TARGET_HOME#/}
-    add() { for p in "$@"; do if [ -e "/$p" ]; then paths+=("$p"); else warn "missing, skipped: /$p"; fi; done; }
-    # 1. everything listed as PRIVATE (home-relative) and the private system files
-    for p in "${PRIVATE_PATHS[@]}"; do add "$H/$p"; done
-    add "${PRIVATE_SYSTEM[@]}"
-    # 2. every loose file in ~ except .bashrc (public) and .index
-    shopt -s nullglob dotglob
-    for f in "$TARGET_HOME"/*; do
-        [ -d "$f" ] && [ ! -L "$f" ] && continue
-        case ${f##*/} in .bashrc|.index) continue ;; esac
-        paths+=("${f#/}")
+# =================================================================================================================
+# PUBLISH (source system, as the normal user; sudo only for the archive)
+# =================================================================================================================
+letter() { printf "\\$(printf '%03o' $((97 + $1)))"; }      # 0 -> a, 1 -> b ...
+DEST=""; ARCHIVE_PATH=""; COMMIT=""; WORK=""
+
+pub_pick_dest() {   # sets DEST to <drive>/Software after you confirm; no drive -> wait and rescan; n -> abort
+    local d dests lbl i pick ok
+    while :; do
+        dests=(); for d in "$MEDIA_ROOT"/*/Software; do [ -d "$d" ] && dests+=("$d"); done
+        if [ ${#dests[@]} -eq 0 ]; then pause "Please attach external drive and press enter when ready. "; continue; fi
+        if [ ${#dests[@]} -eq 1 ]; then
+            d=${dests[0]}; lbl=$(basename "$(dirname "$d")")/Software
+            confirm "found $lbl - create archive here?" && { DEST=$d; return 0; }
+            die "aborted"
+        fi
+        echo "found:"; for i in "${!dests[@]}"; do printf '  %s. %s/Software\n' "$(letter "$i")" "$(basename "$(dirname "${dests[i]}")")"; done
+        read -r -p "enter letter to select (Enter = rescan, q = abort): " pick < "$TTY_IN" || die "no input available"
+        [ "$pick" = q ] && die "aborted"
+        [ -z "$pick" ] && continue
+        ok=0; for i in "${!dests[@]}"; do [ "$pick" = "$(letter "$i")" ] && { DEST=${dests[i]}; ok=1; }; done
+        [ $ok -eq 1 ] && return 0
     done
-    # 3. everything in ~/Software that is neither published nor skipped (new items are PRIVATE by default)
-    for f in "$TARGET_HOME"/Software/*; do
-        e=${f##*/}; k=0
-        for p in "${PUBLIC_SOFTWARE[@]}" "${SKIP_SOFTWARE[@]}"; do [[ $e == $p ]] && k=1; done
-        [ $k -eq 0 ] && paths+=("${f#/}")
-    done
-    shopt -u nullglob dotglob
-    unclassified_scan
-    local ex=(--anchored) x
-    for x in "${ARCHIVE_EXCLUDES[@]}"; do ex+=("--exclude=$H/$x"); done
-    say "private archive: ${#paths[@]} items -> $priv"
-    if [ $DRY -eq 1 ]; then
-        printf '  /%s\n' "${paths[@]}"
-        say "full home backup -> $full  (all of /$H except: ${FULL_EXCLUDES[*]})"
-        return 0
-    fi
-    tar --zstd -cpf "$priv.partial" --numeric-owner "${ex[@]}" "${paths[@]}" || { rm -f "$priv.partial"; die "private tar failed, nothing written"; }
-    mv "$priv.partial" "$priv"
-    echo "Written: $priv  $(ls -lh "$priv" | awk '{print $5}')  entries: $(tar --zstd -tf "$priv" | wc -l)"
-    say "full home backup -> $full"
-    local fx=(--anchored); for x in "${FULL_EXCLUDES[@]}"; do fx+=("--exclude=$H/$x"); done
-    tar --zstd -cpf "$full.partial" --numeric-owner "${fx[@]}" "$H" || { rm -f "$full.partial"; die "full tar failed, nothing written"; }
-    mv "$full.partial" "$full"
-    echo "Written: $full  $(ls -lh "$full" | awk '{print $5}')  entries: $(tar --zstd -tf "$full" | wc -l)"
-    echo "Both files are UNENCRYPTED and contain keys/passwords/history: keep them on the external drive only."
-    echo "Restore either one with: rebuild.sh archive --archive FILE   (the full backup also overwrites configs: use only for a complete restore)."
 }
 
-sync_repo() {   # live system -> this repo. Run as the normal user. Never commits or pushes.
-    [ "$(id -u)" -ne 0 ] || die "run as $TARGET_USER, not root (files in the repo must stay owned by you)"
-    [ "$(id -un)" = "$TARGET_USER" ] || die "run as $TARGET_USER"
-    command -v rsync >/dev/null || die "rsync missing"
-    local F=$REPO_DIR/files rel f n k ex=() x d
-    for x in "${SYNC_EXCLUDES[@]}"; do ex+=("--exclude=$x"); done
-    # --- home: public dirs (mirrored, deletions included), public files, public ~/Software items
-    say "sync: home"
-    for rel in "${PUBLIC_DIRS[@]}"; do
-        if [ -d "$TARGET_HOME/$rel" ]; then
-            mkdir -p "$F/home/$rel"
-            rsync -rltE --delete --safe-links "${ex[@]}" "$TARGET_HOME/$rel"/ "$F/home/$rel"/ || warn "rsync failed: $rel"
-        else warn "public dir missing on this system: ~/$rel"; fi
-    done
-    for rel in "${PUBLIC_FILES[@]}"; do
-        if [ -e "$TARGET_HOME/$rel" ]; then mkdir -p "$(dirname "$F/home/$rel")"; rsync -ltE "$TARGET_HOME/$rel" "$F/home/$rel"
-        else warn "public file missing on this system: ~/$rel"; fi
-    done
-    mkdir -p "$F/Software"
-    shopt -s nullglob
-    for k in "${PUBLIC_SOFTWARE[@]}"; do
-        for f in "$TARGET_HOME"/Software/$k; do
-            if [ -d "$f" ]; then rsync -rltE --delete --safe-links "${ex[@]}" "$f"/ "$F/Software/${f##*/}"/
-            else rsync -ltE "$f" "$F/Software/"; fi
-        done
-    done
-    # files that were published earlier but no longer exist live (loose items only; dirs are mirrored above)
-    for f in "$F"/Software/*; do
-        [ -d "$f" ] && continue
-        [ -e "$TARGET_HOME/Software/${f##*/}" ] || { echo "removed from repo (gone live): Software/${f##*/}"; rm -f "$f"; }
-    done
-    shopt -u nullglob
-    # --- system: files already tracked in files/system, plus unowned .repo files
-    say "sync: system files"
-    while IFS= read -r -d '' f; do
+pub_archive() {
+    say "1/4 archive"
+    pub_pick_dest
+    local real; real=$(realpath "$DEST")
+    case $real/ in "$TARGET_HOME"/*) die "$real is inside $TARGET_HOME - the archive would contain itself" ;; esac
+    local stamp name H x m f p
+    stamp=$(date +%F); name=${stamp}_asahi_home_full.tar.zst; H=${TARGET_HOME#/}
+    ARCHIVE_PATH=$DEST/$name
+    if [ -e "$ARCHIVE_PATH" ]; then confirm "$name already exists here - replace it?" || die "aborted"; fi
+    # space: du of home (basename excludes, so an upper bound) against free space on the drive
+    local ud=() est avail
+    for x in "${ARCHIVE_EXCLUDES[@]}"; do ud+=("--exclude=${x##*/}"); done
+    est=$(du -sk "${ud[@]}" "$TARGET_HOME" 2>/dev/null | cut -f1); avail=$(df -Pk "$DEST" | awk 'NR==2{print $4}')
+    echo "home ~$((est/1024/1024)) GiB before compression, $((avail/1024/1024)) GiB free on the drive."
+    if [ "$avail" -lt "$est" ]; then confirm "Free space is below the uncompressed size (the archive is usually about half). Continue?" || die "aborted"; fi
+    # tar arguments
+    local ex=(--no-anchored "--exclude=*_asahi_home_full*" --anchored) paths=("$H")
+    for x in "${ARCHIVE_EXCLUDES[@]}"; do ex+=("--exclude=$H/$x"); done
+    while read -r m; do ex+=("--exclude=${m#/}"); done < <(findmnt -rn -o TARGET | grep "^$TARGET_HOME/")     # drives mounted inside home
+    for p in "${ARCHIVE_SYSTEM[@]}"; do if [ -e "/$p" ]; then paths+=("$p"); else warn "missing, skipped: /$p"; fi; done
+    if [ $DRY -eq 1 ]; then
+        echo "[dry-run] would write $ARCHIVE_PATH"
+        echo "[dry-run] tar paths: ${paths[*]}"; echo "[dry-run] excluded: ${ARCHIVE_EXCLUDES[*]} (+ any *_asahi_home_full*, mounts inside home)"
+        return 0
+    fi
+    pause "Close all open applications and press Enter when done. "
+    sudo -v || die "sudo failed"
+    local partial=$ARCHIVE_PATH.partial rc ticker
+    ( while :; do printf '\r  %s written ' "$(numfmt --to=iec "$(stat -c%s "$partial" 2>/dev/null || echo 0)")"; sleep 3; done ) & ticker=$!
+    sudo tar -C / -I 'zstd -T0' -cpf "$partial" --numeric-owner "${ex[@]}" "${paths[@]}"; rc=$?
+    kill "$ticker" 2>/dev/null; wait "$ticker" 2>/dev/null; echo
+    # tar exits 1 when a file changed while being read (a browser, say): the archive is still good
+    [ $rc -le 1 ] || { sudo rm -f "$partial"; die "tar failed (exit $rc), nothing written"; }
+    [ $rc -eq 0 ] || warn "some files changed while being archived (normal for a live session)"
+    echo "Verifying (full read-back)..."
+    sudo tar -I 'zstd -T0' -tf "$partial" > "$WORK/list" || { sudo rm -f "$partial"; die "archive does not read back cleanly, nothing kept"; }
+    local bad=0
+    for p in .bashrc .ssh .claude; do [ -e "$TARGET_HOME/$p" ] && ! grep -q "^$H/$p" "$WORK/list" && { warn "missing from archive: ~/$p"; bad=1; }; done
+    for p in "${ARCHIVE_SYSTEM[@]}"; do [ -e "/$p" ] && ! grep -q "^$p" "$WORK/list" && { warn "missing from archive: /$p"; bad=1; }; done
+    grep -E "^$H/(Downloads|Screenshots|\.index)(/|$)" "$WORK/list" | head -3 | grep . && { warn "excluded folder found in archive"; bad=1; }
+    [ $bad -eq 0 ] || { sudo rm -f "$partial"; die "archive check failed, nothing kept"; }
+    sudo mv -f "$partial" "$ARCHIVE_PATH"
+    echo "Archive OK: $ARCHIVE_PATH  $(du -h "$ARCHIVE_PATH" | cut -f1)  $(wc -l < "$WORK/list") entries"
+}
+
+pub_sync() {   # live system -> $STAGE/files + $STAGE/lists.txt (in --dry-run $STAGE is a scratch copy, the repo is untouched)
+    local F=$STAGE/files f rel k t base
+    rsync -rltE --delete --safe-links --exclude=__pycache__ --exclude='*.bak*' --exclude='*.pyc' "$TARGET_HOME/Software/asahi_atomic"/ "$F/Software/asahi_atomic"/ || warn "rsync failed: asahi_atomic"
+    while IFS= read -r -d '' f; do          # system files already tracked in files/system
         rel=${f#"$F/system/"}
         [ "$rel" = etc/rpm/macros.image-language-conf ] && continue      # repo-only: installed by the repos phase, absent on A
         if [ -r "/$rel" ]; then rsync -ltE "/$rel" "$f"; else warn "tracked system file unreadable/missing: /$rel"; fi
     done < <(find "$F/system" -type f -print0)
-    for f in /etc/yum.repos.d/*.repo; do
+    for f in /etc/yum.repos.d/*.repo; do    # unowned repo files are picked up automatically
         rpm -qf "$f" >/dev/null 2>&1 || { [ -e "$F/system${f}" ] || echo "new unowned repo file: $f"; rsync -ltE "$f" "$F/system/etc/yum.repos.d/"; }
     done
-    # --- package lists: install/remove/closure regenerated against the Minimal baseline; enable/disable kept as they are
-    say "sync: lists.txt"
-    local base; base=$(ls "$TARGET_HOME"/Software/asahi_atomic/baseline-remix44-minimal-packages_*.txt 2>/dev/null | tail -1)
+    # package lists: install/remove/closure regenerated against the Minimal baseline; enable/disable kept as they are
+    base=$(ls "$TARGET_HOME"/Software/asahi_atomic/baseline-remix44-minimal-packages_*.txt 2>/dev/null | tail -1)
     [ -n "$base" ] || die "no baseline-remix44-minimal-packages_*.txt in ~/Software/asahi_atomic"
-    local t; t=$(mktemp -d)
+    t=$WORK/lists; mkdir -p "$t"
     sort -u "$base" > "$t/minimal"
     rpm -qa --qf '%{NAME}.%{ARCH}\n' | sort -u > "$t/have"
     dnf repoquery --userinstalled --qf '%{name}.%{arch}\n' 2>/dev/null | sort -u > "$t/user"
     [ -s "$t/user" ] || die "dnf repoquery --userinstalled returned nothing"
     comm -23 "$t/user" "$t/minimal" > "$t/install"
     comm -23 "$t/minimal" "$t/have" > "$t/remove"
-    cp "$t/have" "$t/closure"   # verify compares against the FULL package set
     {
-        echo "# Machine-readable lists for rebuild.sh. Regenerated by 'rebuild.sh sync-repo' on $(date +%F) against $(basename "$base") (F44 Asahi Remix)."
+        echo "# Machine-readable lists for rebuild.sh. Regenerated by 'rebuild.sh publish' on $(date +%F) against $(basename "$base") (F44 Asahi Remix)."
         for k in install remove; do echo "[$k]"; cat "$t/$k"; done
         for k in enable disable; do echo "[$k]"; section "$k"; done
-        echo "[closure]"; cat "$t/closure"
-    } > "$t/lists.new"
-    mv "$t/lists.new" "$LISTS"
-    echo "install $(wc -l < "$t/install")  remove $(wc -l < "$t/remove")  closure $(wc -l < "$t/closure")   ([enable]/[disable] kept - edit by hand if services changed)"
-    rm -rf "$t"
-    # --- GNOME settings (volatile history/path keys and per-connection nm-applet sections dropped)
-    say "sync: dconf"
+        echo "[closure]"; cat "$t/have"
+    } > "$STAGE/lists.txt"
+    # GNOME settings (volatile history/path keys and per-connection nm-applet sections dropped)
     dconf dump / | awk '
         /^\[/ { skip = ($0 ~ /^\[org\/gnome\/nm-applet\//) }
         skip { next }
         /^(last-save-directory|last-folder-path|command-history|looking-glass-history)=/ { next }
         { print }' > "$F/dconf-user.ini"
-    # --- secrets scan: content patterns + any PRIVATE path that leaked into files/
-    say "secrets scan"
-    local hits=0
-    if grep -rIEn -e '-----BEGIN [A-Z ]*PRIVATE KEY' -e 'gh[pousr]_[A-Za-z0-9]{30,}' -e 'github_pat_' -e 'sk-ant-[A-Za-z0-9]' \
-            -e 'AKIA[0-9A-Z]{16}' -e '(password|passwd|psk|secret|api[_-]?key|token)[[:space:]]*[=:][[:space:]]*[^[:space:]]{6,}' \
-            --exclude-dir=.git "$REPO_DIR/files" "$LISTS"; then hits=1; fi
-    for rel in "${PRIVATE_PATHS[@]}"; do
-        [[ " ${PUBLIC_FILES[*]} " == *" $rel/"* || " ${PUBLIC_FILES[*]} " == *\"$rel/* ]] && continue   # only single public files inside
-        [ -e "$F/home/$rel" ] && { echo "PRIVATE path present in repo: files/home/$rel"; hits=1; }
+}
+
+pub_gh_ready() {   # push rights on the repo, or explain how to log in and retry
+    local slug
+    slug=$(git -C "$REPO_DIR" remote get-url origin | sed -E 's#.*github.com[:/]##; s#\.git$##')
+    while ! [ "$(gh api "repos/$slug" --jq .permissions.push 2>/dev/null)" = true ]; do
+        echo "GitHub login unsuccessful (or no push access to $slug)."
+        echo "  To log in, run this in the terminal:   gh auth login      (GitHub.com > HTTPS > log in with a web browser)"
+        echo "  then:                                  gh auth setup-git"
+        pause "Press Enter to try again (Ctrl+C to quit). "
     done
-    for rel in "${PRIVATE_SYSTEM[@]}"; do
-        [ -e "$F/system/$rel" ] && { echo "PRIVATE path present in repo: files/system/$rel"; hits=1; }
+}
+
+pub_github() {
+    say "2/4 GitHub"
+    local STAGE=$REPO_DIR
+    if [ $DRY -eq 1 ]; then      # work on a scratch copy of the repo files so nothing real changes
+        STAGE=$WORK/preview; mkdir -p "$STAGE"; cp -a "$REPO_DIR/files" "$REPO_DIR/lists.txt" "$STAGE"/
+    fi
+    pub_gh_ready
+    pub_sync
+    # --- secrets scan: every hit is shown; "skip? y" keeps that file out of the commit, "n" includes it
+    local hits=() skip=() line file p
+    mapfile -t hits < <(grep -rIEn -e '-----BEGIN [A-Z ]*PRIVATE KEY' -e 'gh[pousr]_[A-Za-z0-9]{30,}' -e 'github_pat_' -e 'sk-ant-[A-Za-z0-9]' \
+        -e 'AKIA[0-9A-Z]{16}' -e '(password|passwd|psk|secret|api[_-]?key|token)[[:space:]]*[=:][[:space:]]*[^[:space:]]{6,}' \
+        "$STAGE/files" "$STAGE/lists.txt" 2>/dev/null)
+    for p in "${ARCHIVE_SYSTEM[@]}"; do [ -e "$STAGE/files/system/$p" ] && hits+=("$STAGE/files/system/$p:0:private path that belongs in the archive only"); done
+    for line in "${hits[@]}"; do
+        file=${line%%:*}
+        [[ " ${skip[*]:-} " == *" $file "* ]] && continue
+        printf '\n  %s\n' "${line/#$STAGE\//}" | cut -c1-200
+        confirm "  skip?" && skip+=("$file")
     done
-    if [ $hits -eq 1 ]; then warn "secrets scan has hits (above): review before any push"; else echo "clean."; fi
-    say "unclassified entries"
-    unclassified_scan
-    say "git status / diff stat (nothing is committed or pushed)"
-    git -C "$REPO_DIR" status --short | head -60
-    git -C "$REPO_DIR" diff --stat | tail -25
-    echo "Review with: git -C $REPO_DIR diff   - then commit/push yourself."
+    # --- what would change
+    local rel_skip=() n ahead
+    for file in "${skip[@]}"; do rel_skip+=("${file#"$STAGE"/}"); done
+    git -C "$REPO_DIR" fetch -q origin 2>/dev/null
+    ahead=$(git -C "$REPO_DIR" rev-list --count origin/main..HEAD 2>/dev/null || echo 0)
+    if [ $DRY -eq 1 ]; then
+        n=$(diff -rq "$REPO_DIR/files" "$STAGE/files" 2>/dev/null | wc -l); diff -q "$REPO_DIR/lists.txt" "$STAGE/lists.txt" >/dev/null || n=$((n+1))
+        echo "[dry-run] $n repo file(s) would change, ${#rel_skip[@]} skipped, $ahead unpushed commit(s). Nothing committed or pushed."
+        COMMIT=$(git -C "$REPO_DIR" rev-parse --short HEAD)
+        return 0
+    fi
+    n=$(git -C "$REPO_DIR" status --porcelain | wc -l)
+    if [ "$n" -eq 0 ] && [ "$ahead" -eq 0 ]; then echo "GitHub repo is already up to date."
+    else
+        confirm "Push to Github? ($n changed file(s), ${#rel_skip[@]} skipped)" || die "aborted"
+        git -C "$REPO_DIR" add -A
+        [ ${#rel_skip[@]} -gt 0 ] && git -C "$REPO_DIR" reset -q -- "${rel_skip[@]}"
+        git -C "$REPO_DIR" diff --cached --quiet || git -C "$REPO_DIR" commit -q -m "sync $(date +%F)"
+        git -C "$REPO_DIR" push -q origin main || die "push failed"
+    fi
+    COMMIT=$(git -C "$REPO_DIR" rev-parse --short HEAD)
+    echo "Verifying GitHub..."
+    git -C "$REPO_DIR" fetch -q origin
+    [ "$(git -C "$REPO_DIR" rev-parse HEAD)" = "$(git -C "$REPO_DIR" rev-parse origin/main)" ] || die "origin/main does not match the local commit"
+    echo "origin/main = local commit $COMMIT."
+    curl -fsSL https://raw.githubusercontent.com/memory-colors/asahi-a/main/bootstrap.sh 2>/dev/null | cmp -s - "$REPO_DIR/bootstrap.sh" \
+        && echo "bootstrap.sh is downloadable from raw.githubusercontent.com." \
+        || warn "could not confirm bootstrap.sh via raw.githubusercontent.com (GitHub's cache can lag a few minutes)"
+}
+
+pub_cleanup() {
+    say "3/4 cleanup"
+    local items=() f
+    for f in "$DEST"/*.partial; do [ -e "$f" ] && items+=("$f"); done
+    case $WORK in /tmp/asahi-publish.*) items+=("$WORK") ;; esac
+    if [ ${#items[@]} -eq 0 ]; then echo "Nothing to clean up."; return 0; fi
+    echo "Left over from this run:"; for f in "${items[@]}"; do printf '  %s  (%s)\n' "$f" "$(du -sh "$f" 2>/dev/null | cut -f1)"; done
+    if confirm "Delete these?"; then for f in "${items[@]}"; do rm -rf -- "$f"; done; echo "Deleted."; fi
+}
+
+pub_readme() {
+    say "4/4 restore README"
+    local out; out=$DEST/$(date +%F)_asahi_restore_README.txt
+    [ $DRY -eq 1 ] && out=$WORK/$(date +%F)_asahi_restore_README.txt
+    cat > "$out" <<TXT
+Restore Fedora Asahi Remix 44 ("A") from scratch - written $(date +%F) by rebuild.sh publish
+
+Archive: $(basename "$ARCHIVE_PATH")  (in this folder; unencrypted: it holds keys, history and Wi-Fi passwords, keep it on this drive only)
+GitHub:  https://github.com/memory-colors/asahi-a  (commit ${COMMIT:-?})
+
+1. From macOS run the Asahi installer and install Fedora Asahi Remix 44 MINIMAL. Create the user "$TARGET_USER". Boot, log in, connect to the network.
+2. Plug in the drive that holds this file.
+3. Run:
+     curl -fsSL https://raw.githubusercontent.com/memory-colors/asahi-a/main/bootstrap.sh | sudo bash
+   It clones the repo to /root/asahi-a and runs rebuild.sh. Every phase asks first (repos, packages, files, services, apps, archive, verify);
+   dnf shows its own prompts, there is no -y. In the "archive" phase it lists every *_asahi_home_full.tar.zst it can find - enter the letter
+   of the one you want. If the drive is not mounted it offers to mount it read-only.
+4. Reboot, then:  sudo /root/asahi-a/rebuild.sh verify
+
+Not automated (do by hand if wanted): bleachbit locale cleanup; dracut/plymouth initramfs rebuild; bootloader / m1n1;
+Claude Code install:  curl -fsSL https://claude.ai/install.sh | bash   (as $TARGET_USER)
+
+Not in the archive: ~/Downloads, ~/Screenshots, ~/.index, caches, Trash, LosslessCut and czkawka-gui (the "apps" phase downloads those).
+TXT
+    echo "Wrote $out"
+    [ $DRY -eq 1 ] && cat "$out"
+    return 0
+}
+
+publish() {
+    [ "$(id -u)" -ne 0 ] || die "run as $TARGET_USER, not root (publish uses sudo itself, only for the archive)"
+    [ "$(id -un)" = "$TARGET_USER" ] || die "run as $TARGET_USER"
+    local c; for c in rsync zstd git gh tar sudo curl numfmt dnf; do command -v "$c" >/dev/null || die "$c missing"; done
+    WORK=$(mktemp -d /tmp/asahi-publish.XXXXXX)
+    [ $DRY -eq 1 ] && echo "(dry-run: asks the same questions, writes nothing to the drive, the repo or GitHub)"
+    pub_archive
+    pub_github
+    pub_cleanup
+    pub_readme
+    pause "Done. Press Enter to close. "
+}
+
+# =================================================================================================================
+# RESTORE: archive phase
+# =================================================================================================================
+
+mountable_parts() {   # NAME|FSTYPE|SIZE|LABEL of unmounted partitions with a filesystem we can read
+    local l
+    lsblk -P -o NAME,TYPE,FSTYPE,SIZE,LABEL,MOUNTPOINT 2>/dev/null | while read -r l; do
+        ( eval "$l"
+          [ "$TYPE" = part ] && [ -z "$MOUNTPOINT" ] || exit 0
+          case $FSTYPE in exfat|ext4|btrfs|xfs|vfat|ntfs) echo "$NAME|$FSTYPE|$SIZE|$LABEL" ;; esac )
+    done
 }
 
 phase_archive() {
-    say "archive restore from $ARCHIVE"
-    [ -f "$ARCHIVE" ] || die "$ARCHIVE is not a file (make it with: sudo ./rebuild.sh make-archive DIR)"
+    say "archive"
+    local opts=() mounted=() i pick kind val name fs size label
+    if [ -n "$ARCHIVE" ]; then
+        [ -f "$ARCHIVE" ] || die "$ARCHIVE is not a file"
+    else
+        while :; do
+            opts=()
+            while IFS= read -r val; do [ -n "$val" ] && opts+=("A|$val"); done < <(find /run/media /mnt /persist -maxdepth 4 -type f -name '*_asahi_home_full.tar.zst' 2>/dev/null | sort -r)
+            [ ${#opts[@]} -gt 0 ] && echo "found:" || echo "no *_asahi_home_full.tar.zst found on a mounted drive."
+            while IFS= read -r val; do [ -n "$val" ] && opts+=("M|$val"); done < <(mountable_parts)
+            [ ${#opts[@]} -eq 0 ] && echo "(no drives to mount either)"
+            for i in "${!opts[@]}"; do
+                kind=${opts[i]%%|*}; val=${opts[i]#*|}
+                if [ "$kind" = A ]; then printf '  %s. %s\n' "$(letter "$i")" "$val"
+                else IFS='|' read -r name fs size label <<<"$val"; printf '  %s. mount /dev/%s (%s, %s, "%s") and look inside\n' "$(letter "$i")" "$name" "$fs" "$size" "$label"; fi
+            done
+            [ $DRY -eq 1 ] && { echo "[dry-run] would ask for a letter here"; return 0; }
+            read -r -p "enter letter to select (Enter = rescan, q = skip this phase): " pick < "$TTY_IN" || return 0
+            [ "$pick" = q ] && return 0
+            for i in "${!opts[@]}"; do
+                [ "$pick" = "$(letter "$i")" ] || continue
+                kind=${opts[i]%%|*}; val=${opts[i]#*|}
+                if [ "$kind" = A ]; then ARCHIVE=$val; break 2; fi
+                name=${val%%|*}
+                mkdir -p "/mnt/restore-$name" && mount -o ro "/dev/$name" "/mnt/restore-$name" && mounted+=("/mnt/restore-$name") || warn "mount of /dev/$name failed"
+            done
+        done
+    fi
+    echo "Using $ARCHIVE"
     echo "Unpacks over / with the original owners and modes (expects $TARGET_USER = uid 1000)."
-    tar --zstd -tf "$ARCHIVE" | sed -n '1,12p'; echo "..."
+    tar -I zstd -tf "$ARCHIVE" | sed -n '1,12p'; echo "..."
     ask "Unpack it over the system now?" || return 0
-    run tar --zstd -xpf "$ARCHIVE" -C / --numeric-owner
+    run tar -I zstd -xpf "$ARCHIVE" -C / --numeric-owner
     # the SF fonts are stored once (user copy); root GUI apps (pkexec) need them system-wide too
     local d
     for d in "$TARGET_HOME"/.local/share/fonts/SF-*; do [ -d "$d" ] && run cp -a "$d" /usr/share/fonts/; done
     run chmod 600 /etc/NetworkManager/system-connections/*.nmconnection 2>/dev/null
     run restorecon -RF /etc/NetworkManager /etc/mullvad-vpn /usr/share/icons /usr/share/fonts /var/lib/AccountsService "$TARGET_HOME" 2>/dev/null
     run fc-cache -f
+    as_user fc-cache -f
     run gtk-update-icon-cache -f -q /usr/share/icons/MacTahoe-nord-dark 2>/dev/null
     run nmcli connection reload 2>/dev/null
+    for d in "${mounted[@]}"; do umount "$d" 2>/dev/null && rmdir "$d"; done
 }
 
 phase_verify() {
@@ -410,8 +479,7 @@ phase_verify() {
     rm -rf "$tmp"
 }
 
-if [ -n "$MAKE_SET" ]; then make_archive "$MAKE"; exit $?; fi
-if [ $SYNC -eq 1 ]; then sync_repo; exit $?; fi
+if [ $PUBLISH -eq 1 ]; then publish; exit $?; fi
 preflight
 for p in "${PHASES[@]}"; do
     case $p in
