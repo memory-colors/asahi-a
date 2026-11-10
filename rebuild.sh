@@ -51,7 +51,8 @@ ARCHIVE_EXCLUDES=(Downloads Screenshots Screencasts Pictures Photo Video Music A
     .config/Claude/claude-code .config/Claude/Cache ".config/Claude/Code Cache" .config/Claude/GPUCache
     .config/Claude/DawnGraphiteCache .config/Claude/DawnWebGPUCache)           # Claude Desktop caches
 ARCHIVE_SYSTEM=(etc/NetworkManager/system-connections etc/mullvad-vpn var/lib/AccountsService/users/$TARGET_USER var/lib/AccountsService/icons/$TARGET_USER
-    usr/share/icons/{MacTahoe-nord,MacTahoe-nord-dark,WhiteSur-grey,Bibata-Modern-Ice,breeze_cursors})
+    usr/share/icons/{MacTahoe-nord,MacTahoe-nord-dark,WhiteSur-grey,Bibata-Modern-Ice,breeze_cursors}
+    persist/Software/thunar-fm)       # Thunar build tree + src.rpm; lives on /persist, which is not part of the home archive (restored into ~/Software/thunar-fm, see phase_archive)
 
 say()  { printf '\n\033[1m== %s ==\033[0m\n' "$*"; }
 warn() { printf '\033[33mWARN: %s\033[0m\n' "$*" >&2; }
@@ -147,6 +148,11 @@ phase_files() {
     run install -D -m 0755 "$A/reboot-picker-helper" /usr/local/libexec/reboot-picker-helper
     run install -D -m 0440 "$A/reboot-picker-sudoers" /etc/sudoers.d/reboot-picker
     run visudo -cf /etc/sudoers.d/reboot-picker
+    # /persist (exFAT data partition, label "persist"): add the fstab line only if missing; nofail, so a machine without that partition still boots
+    if ! grep -q '^LABEL=persist[[:space:]]' /etc/fstab; then
+        run install -d /persist
+        run sh -c "echo 'LABEL=persist /persist exfat rw,nofail,uid=1000,gid=1000,umask=022,x-systemd.device-timeout=5s 0 0' >> /etc/fstab"
+    fi
     run dconf update
     # fm-tweaks (Thunar/Qt theming engine): the archive phase brings back the full repo with history; this copy (no .git) is the fallback when the archive is missing or older
     if [ -d "$REPO_DIR/files/Software/fm-tweaks" ] && [ ! -e "$TARGET_HOME/Software/fm-tweaks" ]; then
@@ -489,6 +495,13 @@ phase_archive_inner() {
     # the SF fonts are stored once (user copy); root GUI apps (pkexec) need them system-wide too
     local d
     for d in "$TARGET_HOME"/.local/share/fonts/SF-*; do [ -d "$d" ] && run cp -a "$d" /usr/share/fonts/; done
+    # the Thunar build tree was archived from /persist; on a fresh disk there is no /persist partition, so it goes into the home folder instead
+    if [ -d /persist/Software/thunar-fm ] && ! mountpoint -q /persist; then
+        run install -d -o "$TARGET_USER" -g "$TARGET_USER" "$TARGET_HOME/Software"
+        if [ -e "$TARGET_HOME/Software/thunar-fm" ]; then warn "$TARGET_HOME/Software/thunar-fm already exists; the archived Thunar build tree stays at /persist/Software/thunar-fm"
+        else run mv /persist/Software/thunar-fm "$TARGET_HOME/Software/thunar-fm" && run chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/Software/thunar-fm"; fi
+        run rmdir /persist/Software /persist 2>/dev/null
+    fi
     run chmod 600 /etc/NetworkManager/system-connections/*.nmconnection 2>/dev/null
     run restorecon -RF /etc/NetworkManager /etc/mullvad-vpn /usr/share/icons /usr/share/fonts /var/lib/AccountsService "$TARGET_HOME" 2>/dev/null
     run fc-cache -f

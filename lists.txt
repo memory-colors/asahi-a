@@ -282,6 +282,7 @@ words.noarch
 xmlrpc-c.aarch64
 xmlrpc-c-client.aarch64
 [enable]
+persist-macos-cleanup.service
 [disable]
 [closure]
 7zip.aarch64

@@ -1,0 +1,11 @@
+[Unit]
+Description=Remove macOS/trash clutter from /persist
+RequiresMountsFor=/persist
+After=persist.mount
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/rm -rf /persist/.Trashes /persist/.Spotlight-V100 /persist/.fseventsd /persist/.Trash-1000
+
+[Install]
+WantedBy=multi-user.target
