@@ -1,0 +1,19 @@
+--- a/thunar/thunar-details-view.c
++++ b/thunar/thunar-details-view.c
+@@ -886,12 +886,11 @@
+               return TRUE;
+             }
+ 
+-          if (column != name_column)
+-            gtk_tree_selection_unselect_all (selection);
++          /* whole-row clicks: a press on any column of a row acts like a press on the name,
++           * so double clicks and selection work on the blank part of a row (no rubber banding
++           * from rows; it still starts on empty space below the list) */
+ 
+-          /* do not start rubber banding from the name column */
+-          if (!gtk_tree_selection_path_is_selected (selection, path)
+-              && column == name_column)
++          if (!gtk_tree_selection_path_is_selected (selection, path))
+             {
+               /* the clicked row does not have the focus and is not
+                * selected, so make it the new selection (start) */

@@ -1,0 +1,288 @@
+Binary files qView-7.1.orig/.qm/qview_bg.qm and qView-7.1/.qm/qview_bg.qm differ
+Binary files qView-7.1.orig/.qm/qview_bn.qm and qView-7.1/.qm/qview_bn.qm differ
+Binary files qView-7.1.orig/.qm/qview_cs.qm and qView-7.1/.qm/qview_cs.qm differ
+Binary files qView-7.1.orig/.qm/qview_de.qm and qView-7.1/.qm/qview_de.qm differ
+Binary files qView-7.1.orig/.qm/qview_es.qm and qView-7.1/.qm/qview_es.qm differ
+Binary files qView-7.1.orig/.qm/qview_et.qm and qView-7.1/.qm/qview_et.qm differ
+Binary files qView-7.1.orig/.qm/qview_fr.qm and qView-7.1/.qm/qview_fr.qm differ
+Binary files qView-7.1.orig/.qm/qview_gl.qm and qView-7.1/.qm/qview_gl.qm differ
+Binary files qView-7.1.orig/.qm/qview_hr.qm and qView-7.1/.qm/qview_hr.qm differ
+Binary files qView-7.1.orig/.qm/qview_hu.qm and qView-7.1/.qm/qview_hu.qm differ
+Binary files qView-7.1.orig/.qm/qview_id.qm and qView-7.1/.qm/qview_id.qm differ
+Binary files qView-7.1.orig/.qm/qview_is.qm and qView-7.1/.qm/qview_is.qm differ
+Binary files qView-7.1.orig/.qm/qview_it.qm and qView-7.1/.qm/qview_it.qm differ
+Binary files qView-7.1.orig/.qm/qview_ja.qm and qView-7.1/.qm/qview_ja.qm differ
+Binary files qView-7.1.orig/.qm/qview_kmr.qm and qView-7.1/.qm/qview_kmr.qm differ
+Binary files qView-7.1.orig/.qm/qview_ko.qm and qView-7.1/.qm/qview_ko.qm differ
+Binary files qView-7.1.orig/.qm/qview_nb_NO.qm and qView-7.1/.qm/qview_nb_NO.qm differ
+Binary files qView-7.1.orig/.qm/qview_nl.qm and qView-7.1/.qm/qview_nl.qm differ
+Binary files qView-7.1.orig/.qm/qview_pl.qm and qView-7.1/.qm/qview_pl.qm differ
+Binary files qView-7.1.orig/.qm/qview_pt_BR.qm and qView-7.1/.qm/qview_pt_BR.qm differ
+Binary files qView-7.1.orig/.qm/qview_pt_PT.qm and qView-7.1/.qm/qview_pt_PT.qm differ
+Binary files qView-7.1.orig/.qm/qview_ru.qm and qView-7.1/.qm/qview_ru.qm differ
+Binary files qView-7.1.orig/.qm/qview_sl.qm and qView-7.1/.qm/qview_sl.qm differ
+Binary files qView-7.1.orig/.qm/qview_sv.qm and qView-7.1/.qm/qview_sv.qm differ
+Binary files qView-7.1.orig/.qm/qview_tr.qm and qView-7.1/.qm/qview_tr.qm differ
+Binary files qView-7.1.orig/.qm/qview_uk.qm and qView-7.1/.qm/qview_uk.qm differ
+Binary files qView-7.1.orig/.qm/qview_zh_Hans.qm and qView-7.1/.qm/qview_zh_Hans.qm differ
+Binary files qView-7.1.orig/.qm/qview_zh_Hant.qm and qView-7.1/.qm/qview_zh_Hant.qm differ
+diff -ruN '--exclude=bin' '--exclude=build' '--exclude=.qmake.stash' '--exclude=Makefile' '--exclude=*.o' '--exclude=.git*' qView-7.1.orig/qView.pro qView-7.1/qView.pro
+--- qView-7.1.orig/qView.pro	2026-11-01 10:26:43.519933629 -0500
++++ qView-7.1/qView.pro	2026-11-01 10:26:43.527815548 -0500
+@@ -83,6 +83,13 @@
+     }
+ }
+ 
++# Embedded-JPEG preview for raw files (needs LibRaw-devel): qmake CONFIG+=raw_preview
++CONFIG(raw_preview) {
++    CONFIG += link_pkgconfig
++    PKGCONFIG += libraw
++    DEFINES += QV_RAW_PREVIEW
++}
++
+ # Stuff for make install
+ # To use a custom prefix: qmake PREFIX=/usr
+ # An environment variable will also work: PREFIX=/usr qmake
+diff -ruN '--exclude=bin' '--exclude=build' '--exclude=.qmake.stash' '--exclude=Makefile' '--exclude=*.o' '--exclude=.git*' qView-7.1.orig/src/qvgraphicsview.cpp qView-7.1/src/qvgraphicsview.cpp
+--- qView-7.1.orig/src/qvgraphicsview.cpp	2026-11-01 10:26:43.520148960 -0500
++++ qView-7.1/src/qvgraphicsview.cpp	2026-11-01 10:31:15.219053713 -0500
+@@ -54,6 +54,7 @@
+     connect(&imageCore, &QVImageCore::animatedFrameChanged, this, &QVGraphicsView::animatedFrameChanged);
+     connect(&imageCore, &QVImageCore::fileChanged, this, &QVGraphicsView::postLoad);
+     connect(&imageCore, &QVImageCore::updateLoadedPixmapItem, this, &QVGraphicsView::updateLoadedPixmapItem);
++    connect(&imageCore, &QVImageCore::rawPreviewUpgraded, this, &QVGraphicsView::onRawPreviewUpgraded);
+ 
+     // Should replace the other timer eventually
+     expensiveScaleTimerNew = new QTimer(this);
+@@ -454,6 +455,34 @@
+ 
+     emit updatedLoadedPixmapItem();
+ }
++
++// Swap the embedded raw preview for the full decode without disturbing zoom/pan:
++// the item grows by k in pixels, so every view transform shrinks by k.
++void QVGraphicsView::onRawPreviewUpgraded(QSize oldSize, QSize newSize)
++{
++    if (oldSize.isEmpty() || newSize.isEmpty())
++        return;
++    const qreal kx = qreal(newSize.width()) / oldSize.width();
++    const qreal ky = qreal(newSize.height()) / oldSize.height();
++
++    const QPointF centre = mapToScene(viewport()->rect().center());
++
++    auto shrink = [kx, ky](const QTransform &t) {
++        return QTransform(t.m11() / kx, t.m12(), t.m21(), t.m22() / ky, t.dx(), t.dy());
++    };
++
++    loadedPixmapItem->setPixmap(getLoadedPixmap());
++    scaledSize = loadedPixmapItem->boundingRect().size().toSize();
++    setTransform(shrink(transform()));
++    absoluteTransform = shrink(absoluteTransform);
++    zoomBasis = shrink(zoomBasis);
++    centerOn(QPointF(centre.x() * kx, centre.y() * ky));
++
++    if (isScalingEnabled)
++        expensiveScaleTimerNew->start();
++
++    emit updatedLoadedPixmapItem();
++}
+ 
+ void QVGraphicsView::resetScale()
+ {
+diff -ruN '--exclude=bin' '--exclude=build' '--exclude=.qmake.stash' '--exclude=Makefile' '--exclude=*.o' '--exclude=.git*' qView-7.1.orig/src/qvgraphicsview.h qView-7.1/src/qvgraphicsview.h
+--- qView-7.1.orig/src/qvgraphicsview.h	2026-11-01 10:26:43.520158436 -0500
++++ qView-7.1/src/qvgraphicsview.h	2026-11-01 10:31:15.219004236 -0500
+@@ -112,6 +112,7 @@
+     void postLoad();
+ 
+     void updateLoadedPixmapItem();
++    void onRawPreviewUpgraded(QSize oldSize, QSize newSize);
+ 
+ private:
+     void updateFilteringMode();
+diff -ruN '--exclude=bin' '--exclude=build' '--exclude=.qmake.stash' '--exclude=Makefile' '--exclude=*.o' '--exclude=.git*' qView-7.1.orig/src/qvimagecore.cpp qView-7.1/src/qvimagecore.cpp
+--- qView-7.1.orig/src/qvimagecore.cpp	2026-11-01 10:26:43.520166020 -0500
++++ qView-7.1/src/qvimagecore.cpp	2026-11-01 10:31:15.218983719 -0500
+@@ -128,15 +128,85 @@
+     }
+ }
+ 
++#ifdef QV_RAW_PREVIEW
++#include <libraw/libraw.h>
++#include <QBuffer>
++#include <QTransform>
++
++// Pull the camera's embedded JPEG out of a raw file (fast; avoids a full LibRaw decode).
++// Returns a null image if the file isn't raw or has no usable JPEG preview.
++static QImage readRawEmbeddedPreview(const QString &fileName)
++{
++    static const QStringList rawSuffixes = {
++        "raf", "arw", "dng", "cr2", "cr3", "crw", "nef", "nrw", "orf", "rw2", "pef", "srw",
++        "sr2", "srf", "raw", "rwl", "3fr", "erf", "kdc", "dcr", "mef", "mos", "mrw", "x3f", "iiq"
++    };
++    if (!rawSuffixes.contains(QFileInfo(fileName).suffix().toLower()))
++        return QImage();
++
++    LibRaw raw;
++    if (raw.open_file(QFile::encodeName(fileName).constData()) != LIBRAW_SUCCESS)
++        return QImage();
++    if (raw.unpack_thumb() != LIBRAW_SUCCESS)
++        return QImage();
++    if (raw.imgdata.thumbnail.tformat != LIBRAW_THUMBNAIL_JPEG || raw.imgdata.thumbnail.tlength == 0)
++        return QImage();
++
++    QByteArray jpeg(raw.imgdata.thumbnail.thumb, static_cast<int>(raw.imgdata.thumbnail.tlength));
++    QBuffer buffer(&jpeg);
++    buffer.open(QIODevice::ReadOnly);
++    QImageReader reader(&buffer, "jpeg");
++    reader.setAutoTransform(true);
++    bool hasExifOrientation = reader.transformation() != QImageIOHandler::TransformationNone;
++    QImage image = reader.read();
++    if (image.isNull())
++        return QImage();
++
++    // Preview carries no orientation of its own: use the raw file's
++    if (!hasExifOrientation)
++    {
++        QTransform t;
++        switch (raw.imgdata.sizes.flip)
++        {
++        case 3: t.rotate(180); break;
++        case 5: t.rotate(-90); break;
++        case 6: t.rotate(90); break;
++        default: break;
++        }
++        if (!t.isIdentity())
++            image = image.transformed(t);
++    }
++    return image;
++}
++#endif
++
+ QVImageCore::ReadData QVImageCore::readFile(const QString &fileName, const QColorSpace &targetColorSpace)
+ {
++    return readFileInternal(fileName, targetColorSpace, true);
++}
++
++QVImageCore::ReadData QVImageCore::readFileInternal(const QString &fileName, const QColorSpace &targetColorSpace, bool allowRawPreview)
++{
+     QImageReader imageReader;
+     imageReader.setAutoTransform(true);
+ 
+     imageReader.setFileName(fileName);
+ 
+     QImage readImage;
+-    if (imageReader.format() == "svg" || imageReader.format() == "svgz")
++    QSize previewSize;
++#ifdef QV_RAW_PREVIEW
++    if (allowRawPreview)
++    {
++        readImage = readRawEmbeddedPreview(fileName);
++        previewSize = readImage.size();
++    }
++#endif
++    const bool usedRawPreview = !readImage.isNull();
++    if (!readImage.isNull())
++    {
++        // embedded raw preview used; skip the slow full decode
++    }
++    else if (imageReader.format() == "svg" || imageReader.format() == "svgz")
+     {
+         // Render vectors into a high resolution
+         QIcon icon;
+@@ -184,9 +254,10 @@
+         readImage,
+         fileInfo.absoluteFilePath(),
+         fileInfo.size(),
+-        imageReader.size(),
++        previewSize.isValid() && !previewSize.isEmpty() ? previewSize : imageReader.size(),
+         targetColorSpace,
+-        {}
++        {},
++        usedRawPreview
+     };
+ 
+     if (readImage.isNull())
+@@ -267,9 +338,45 @@
+ 
+     emit fileChanged();
+ 
++    if (readData.isRawPreview)
++        startRawUpgrade(readData.absoluteFilePath, readData.targetColorSpace);
++
+     requestCaching();
+ }
+ 
++// Full-quality decode of a raw file whose embedded preview is on screen; swaps in when done
++void QVImageCore::startRawUpgrade(const QString &filePath, const QColorSpace &targetColorSpace)
++{
++    if (rawUpgradesInProgress.contains(filePath))
++        return;
++    rawUpgradesInProgress.append(filePath);
++
++    auto *watcher = new QFutureWatcher<ReadData>();
++    connect(watcher, &QFutureWatcher<ReadData>::finished, this, [watcher, filePath, this](){
++        ReadData full = watcher->result();
++        rawUpgradesInProgress.removeAll(filePath);
++        watcher->deleteLater();
++        if (full.errorData.hasError || full.image.isNull())
++            return;
++
++        if (currentFileDetails.isPixmapLoaded && currentFileDetails.fileInfo.absoluteFilePath() == filePath)
++        {
++            const QSize oldSize = loadedPixmap.size();
++            loadedPixmap = QPixmap::fromImage(matchCurrentRotation(full.image));
++            currentFileDetails.loadedPixmapSize = loadedPixmap.size();
++            currentFileDetails.baseImageSize = full.imageSize.isValid() ? full.imageSize : loadedPixmap.size();
++            addToCache(std::move(full));
++            emit rawPreviewUpgraded(oldSize, loadedPixmap.size());
++        }
++        else
++        {
++            // user moved on: still keep the good version cached
++            addToCache(std::move(full));
++        }
++    });
++    watcher->setFuture(QtConcurrent::run(&QVImageCore::readFileInternal, this, filePath, targetColorSpace, false));
++}
++
+ void QVImageCore::closeImage()
+ {
+     currentFileDetails = getEmptyFileDetails();
+diff -ruN '--exclude=bin' '--exclude=build' '--exclude=.qmake.stash' '--exclude=Makefile' '--exclude=*.o' '--exclude=.git*' qView-7.1.orig/src/qvimagecore.h qView-7.1/src/qvimagecore.h
+--- qView-7.1.orig/src/qvimagecore.h	2026-11-01 10:26:43.520175770 -0500
++++ qView-7.1/src/qvimagecore.h	2026-11-01 10:31:15.218868482 -0500
+@@ -65,12 +65,15 @@
+         QSize imageSize;
+         QColorSpace targetColorSpace;
+         ErrorData errorData;
++        bool isRawPreview = false; // image is the embedded JPEG of a raw file; full decode pending
+     };
+ 
+     explicit QVImageCore(QObject *parent = nullptr);
+ 
+     void loadFile(const QString &fileName, bool isReloading = false);
+     ReadData readFile(const QString &fileName, const QColorSpace &targetColorSpace);
++    ReadData readFileInternal(const QString &fileName, const QColorSpace &targetColorSpace, bool allowRawPreview);
++    void startRawUpgrade(const QString &filePath, const QColorSpace &targetColorSpace);
+     void loadPixmap(const ReadData &readData);
+     void closeImage();
+     QList<CompatibleFile> getCompatibleFiles(const QString &dirPath) const;
+@@ -111,6 +114,9 @@
+ 
+     void fileChanged();
+ 
++    // Embedded raw preview replaced by the full decode (same file, larger pixmap)
++    void rawPreviewUpgraded(QSize oldSize, QSize newSize);
++
+ protected:
+     void loadEmptyPixmap();
+     FileDetails getEmptyFileDetails();
+@@ -123,6 +129,7 @@
+     int currentRotation;
+ 
+     QFutureWatcher<ReadData> loadFutureWatcher;
++    QStringList rawUpgradesInProgress;
+ 
+     bool isLoopFoldersEnabled;
+     int preloadingMode;

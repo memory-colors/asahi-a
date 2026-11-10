@@ -1,0 +1,12 @@
+--- a/thunar/thunar-window.c
++++ b/thunar/thunar-window.c
+@@ -5235,6 +5235,9 @@
+ 
+   _thunar_return_if_fail (THUNAR_IS_WINDOW (window));
+ 
++  /* FM-TWEAKS: menu item descriptions are not shown on the status bar */
++  return;
++
+   /* we can only display tooltips if we have a statusbar */
+   if (G_LIKELY (window->statusbar != NULL))
+     {

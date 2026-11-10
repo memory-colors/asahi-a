@@ -1,0 +1,16 @@
+--- a/thunar/thunar-details-view.c	2026-10-24 20:33:44.893277671 -0400
++++ b/thunar/thunar-details-view.c	2026-10-24 20:33:44.920533580 -0400
+@@ -1150,6 +1150,13 @@
+   if (details_view->expandable_folders == FALSE)
+     return FALSE;
+ 
++  /* Ctrl+Up/Down: leave them to GtkTreeView, which moves the cursor WITHOUT changing the selection
++   * (Ctrl+Space then toggles the focused row); the helpers below use set_cursor, which selects */
++  if ((event->state & gtk_accelerator_get_default_mod_mask ()) == GDK_CONTROL_MASK
++      && (event->keyval == GDK_KEY_Up || event->keyval == GDK_KEY_KP_Up
++          || event->keyval == GDK_KEY_Down || event->keyval == GDK_KEY_KP_Down))
++    return FALSE;
++
+   /* Get path of currently highlighted item */
+   gtk_tree_view_get_cursor (tree_view, &path, NULL);
+ 

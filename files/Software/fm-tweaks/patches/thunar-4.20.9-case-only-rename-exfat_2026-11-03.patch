@@ -1,0 +1,46 @@
+--- a/thunar/thunar-file.c	2026-11-03 17:54:38.756047649 -0500
++++ b/thunar/thunar-file.c	2026-11-03 17:54:38.773841794 -0500
+@@ -1990,6 +1990,43 @@
+   /* try to rename the file */
+   renamed_file = g_file_set_display_name (file->gfile, name, cancellable, error);
+ 
++  /* case-only rename on a case-insensitive filesystem (exFAT, FAT) fails
++   * because the target "exists": go through a temporary name instead */
++  if (renamed_file == NULL && error != NULL && *error != NULL)
++    {
++      const gchar *old_name = thunar_file_get_basename (file);
++      gchar       *fold_old = g_utf8_casefold (old_name, -1);
++      gchar       *fold_new = g_utf8_casefold (name, -1);
++
++      if (g_strcmp0 (old_name, name) != 0 && g_strcmp0 (fold_old, fold_new) == 0)
++        {
++          gchar *tmp_name = g_strdup_printf (".%s.rename-tmp", old_name);
++          GFile *tmp_file = g_file_set_display_name (file->gfile, tmp_name, cancellable, NULL);
++
++          if (tmp_file != NULL)
++            {
++              GError *err2 = NULL;
++
++              renamed_file = g_file_set_display_name (tmp_file, name, cancellable, &err2);
++              if (renamed_file != NULL)
++                g_clear_error (error);
++              else
++                {
++                  /* put the original name back */
++                  GFile *back = g_file_set_display_name (tmp_file, old_name, NULL, NULL);
++                  if (back != NULL)
++                    g_object_unref (back);
++                  g_clear_error (error);
++                  g_propagate_error (error, err2);
++                }
++              g_object_unref (tmp_file);
++            }
++          g_free (tmp_name);
++        }
++      g_free (fold_old);
++      g_free (fold_new);
++    }
++
+   /* check if we succeeded */
+   if (renamed_file != NULL)
+     {

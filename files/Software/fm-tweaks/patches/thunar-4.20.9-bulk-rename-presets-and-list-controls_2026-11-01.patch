@@ -1,0 +1,356 @@
+--- a/thunar/thunar-renamer-dialog.c
++++ b/thunar/thunar-renamer-dialog.c
+@@ -102,6 +102,13 @@
+ thunar_renamer_dialog_help (ThunarRenamerDialog *renamer_dialog);
+ static void
+ thunar_renamer_dialog_save (ThunarRenamerDialog *renamer_dialog);
++static void
++thunar_renamer_dialog_presets_clicked (GtkWidget           *button,
++                                       ThunarRenamerDialog *renamer_dialog);
++static gboolean
++thunar_renamer_dialog_tree_key_press (GtkWidget           *tree_view,
++                                      GdkEventKey         *event,
++                                      ThunarRenamerDialog *renamer_dialog);
+ static gboolean
+ thunar_renamer_dialog_action_add_files (ThunarRenamerDialog *renamer_dialog);
+ static gboolean
+@@ -206,6 +213,8 @@
+   GtkWidget *progress;
+ 
+   GtkWidget *mode_combo;
++  GtkWidget *rcombo;
++  GtkWidget *notebook;
+ 
+   GtkTreeViewColumn *name_column;
+ 
+@@ -440,9 +449,11 @@
+   gtk_container_add (GTK_CONTAINER (toolbar), GTK_WIDGET (seperator));
+   gtk_widget_show (GTK_WIDGET (seperator));
+   xfce_gtk_tool_button_new_from_action_entry (get_action_entry (THUNAR_RENAMER_ACTION_ABOUT), G_OBJECT (renamer_dialog), GTK_TOOLBAR (toolbar));
+-  g_object_bind_property (G_OBJECT (renamer_dialog), "standalone", G_OBJECT (toolbar), "visible", G_BINDING_SYNC_CREATE);
+   gtk_box_pack_start (GTK_BOX (gtk_dialog_get_content_area (GTK_DIALOG (renamer_dialog))), toolbar, FALSE, FALSE, 0);
+   gtk_widget_show_all (GTK_WIDGET (toolbar));
++  /* fm patch: toolbar stays hidden (everything is in the right-click menu / Delete key) */
++  gtk_widget_set_no_show_all (toolbar, TRUE);
++  gtk_widget_hide (toolbar);
+ 
+   /* create the main vbox */
+   mbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 12);
+@@ -465,6 +476,7 @@
+   gtk_tree_view_set_rubber_banding (GTK_TREE_VIEW (renamer_dialog->tree_view), TRUE);
+   g_signal_connect (G_OBJECT (renamer_dialog->tree_view), "button-press-event", G_CALLBACK (thunar_renamer_dialog_button_press_event), renamer_dialog);
+   g_signal_connect (G_OBJECT (renamer_dialog->tree_view), "popup-menu", G_CALLBACK (thunar_renamer_dialog_popup_menu), renamer_dialog);
++  g_signal_connect (G_OBJECT (renamer_dialog->tree_view), "key-press-event", G_CALLBACK (thunar_renamer_dialog_tree_key_press), renamer_dialog);
+   g_signal_connect (G_OBJECT (renamer_dialog->tree_view), "row-activated", G_CALLBACK (thunar_renamer_dialog_row_activated), renamer_dialog);
+   gtk_container_add (GTK_CONTAINER (swin), renamer_dialog->tree_view);
+   gtk_widget_show (renamer_dialog->tree_view);
+@@ -553,6 +565,15 @@
+         gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (rcombo), thunarx_renamer_get_name (lp->data));
+       gtk_box_pack_start (GTK_BOX (rbox), rcombo, FALSE, FALSE, 0);
+       gtk_widget_show (rcombo);
++      renamer_dialog->rcombo = rcombo;
++
++      /* add the "Presets" button (menu is built on click) */
++      button = gtk_button_new_with_label (_("Presets"));
++      gtk_widget_set_tooltip_text (button, _("Apply, save or delete a bulk rename preset (rename operation, its settings and the mode)."));
++      g_signal_connect (G_OBJECT (button), "clicked", G_CALLBACK (thunar_renamer_dialog_presets_clicked), renamer_dialog);
++      gtk_box_pack_start (GTK_BOX (rbox), button, FALSE, FALSE, 0);
++      gtk_box_reorder_child (GTK_BOX (rbox), button, 0);
++      gtk_widget_show (button);
+ 
+       /* add a "Help" button */
+       button = gtk_button_new ();
+@@ -589,6 +610,7 @@
+       g_signal_connect (G_OBJECT (notebook), "notify::page", G_CALLBACK (thunar_renamer_dialog_notify_page), renamer_dialog);
+       gtk_container_add (GTK_CONTAINER (frame), notebook);
+       gtk_widget_show (notebook);
++      renamer_dialog->notebook = notebook;
+ 
+       /* determine the last active renamer (as string) */
+       active_str = xfce_rc_read_entry_untranslated (rc, "LastActiveRenamer", "");
+@@ -954,6 +976,7 @@
+     }
+   thunar_renamer_dialog_append_menu_item (renamer_dialog, GTK_MENU_SHELL (menu), THUNAR_RENAMER_ACTION_ADD_FILES);
+   thunar_renamer_dialog_append_menu_item (renamer_dialog, GTK_MENU_SHELL (menu), THUNAR_RENAMER_ACTION_REMOVE_FILES);
++  thunar_renamer_dialog_append_menu_item (renamer_dialog, GTK_MENU_SHELL (menu), THUNAR_RENAMER_ACTION_CLEAR);
+   xfce_gtk_menu_append_separator (GTK_MENU_SHELL (menu));
+   thunar_menu_add_sections (menu, THUNAR_MENU_SECTION_PROPERTIES);
+   thunar_gtk_menu_hide_accel_labels (GTK_MENU (menu));
+@@ -1068,6 +1091,277 @@
+ }
+ 
+ 
++/* ---- presets: groups "Preset:<name>" in Thunar/renamerrc; keys "_Renamer", "_Mode" + the renamer's own settings ---- */
++
++#define TRD_PRESET_PREFIX "Preset:"
++
++static void
++trd_preset_apply (GtkMenuItem         *item,
++                  ThunarRenamerDialog *renamer_dialog)
++{
++  const gchar *name = g_object_get_data (G_OBJECT (item), "preset-name");
++  GHashTable  *settings;
++  GEnumClass  *klass;
++  const gchar *renamer_type;
++  const gchar *mode_str;
++  GtkWidget   *page;
++  XfceRc      *rc;
++  gchar      **entries;
++  gchar       *group;
++  guint        n;
++  gint         i;
++
++  if (name == NULL || renamer_dialog->notebook == NULL)
++    return;
++
++  rc = xfce_rc_config_open (XFCE_RESOURCE_CONFIG, "Thunar/renamerrc", TRUE);
++  if (rc == NULL)
++    return;
++
++  group = g_strconcat (TRD_PRESET_PREFIX, name, NULL);
++  if (xfce_rc_has_group (rc, group))
++    {
++      entries = xfce_rc_get_entries (rc, group);
++      xfce_rc_set_group (rc, group);
++      renamer_type = xfce_rc_read_entry_untranslated (rc, "_Renamer", "");
++      mode_str = xfce_rc_read_entry_untranslated (rc, "_Mode", "");
++
++      settings = g_hash_table_new (g_str_hash, g_str_equal);
++      for (n = 0; entries != NULL && entries[n] != NULL; ++n)
++        if (entries[n][0] != '_')
++          g_hash_table_insert (settings, entries[n], (gchar *) xfce_rc_read_entry_untranslated (rc, entries[n], NULL));
++
++      /* select the renamer and let it load the preset settings */
++      for (i = 0; (page = gtk_notebook_get_nth_page (GTK_NOTEBOOK (renamer_dialog->notebook), i)) != NULL; ++i)
++        if (g_strcmp0 (G_OBJECT_TYPE_NAME (page), renamer_type) == 0)
++          {
++            gtk_combo_box_set_active (GTK_COMBO_BOX (renamer_dialog->rcombo), i);
++            thunarx_renamer_load (THUNARX_RENAMER (page), settings);
++            break;
++          }
++
++      /* restore the mode (name / extension / both) */
++      klass = g_type_class_ref (THUNAR_TYPE_RENAMER_MODE);
++      for (n = 0; n < klass->n_values; ++n)
++        if (g_strcmp0 (mode_str, klass->values[n].value_name) == 0)
++          {
++            gtk_combo_box_set_active (GTK_COMBO_BOX (renamer_dialog->mode_combo), n);
++            break;
++          }
++      g_type_class_unref (klass);
++
++      g_hash_table_destroy (settings);
++      g_strfreev (entries);
++    }
++  g_free (group);
++  xfce_rc_close (rc);
++}
++
++
++
++static void
++trd_preset_delete (GtkMenuItem         *item,
++                   ThunarRenamerDialog *renamer_dialog)
++{
++  const gchar *name = g_object_get_data (G_OBJECT (item), "preset-name");
++  XfceRc      *rc;
++  gchar       *group;
++
++  if (name == NULL)
++    return;
++  rc = xfce_rc_config_open (XFCE_RESOURCE_CONFIG, "Thunar/renamerrc", FALSE);
++  if (rc == NULL)
++    return;
++  group = g_strconcat (TRD_PRESET_PREFIX, name, NULL);
++  xfce_rc_delete_group (rc, group, TRUE);
++  g_free (group);
++  xfce_rc_close (rc);
++}
++
++
++
++static void
++trd_preset_save (GtkMenuItem         *item,
++                 ThunarRenamerDialog *renamer_dialog)
++{
++  ThunarxRenamer *renamer;
++  GHashTable     *settings;
++  GEnumClass     *klass;
++  GEnumValue     *value;
++  GtkWidget      *dialog;
++  GtkWidget      *entry;
++  GtkWidget      *box;
++  XfceRc         *rc;
++  gchar          *name;
++  gchar          *group;
++
++  renamer = thunar_renamer_model_get_renamer (renamer_dialog->model);
++  if (renamer == NULL)
++    return;
++
++  dialog = gtk_dialog_new_with_buttons (_("Save Preset"), GTK_WINDOW (renamer_dialog),
++                                        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
++                                        _("_Cancel"), GTK_RESPONSE_CANCEL,
++                                        _("_Save"), GTK_RESPONSE_ACCEPT, NULL);
++  gtk_dialog_set_default_response (GTK_DIALOG (dialog), GTK_RESPONSE_ACCEPT);
++  box = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
++  gtk_container_set_border_width (GTK_CONTAINER (box), 12);
++  gtk_box_set_spacing (GTK_BOX (box), 6);
++  gtk_box_pack_start (GTK_BOX (box), gtk_label_new (_("Preset name (saves the current rename operation, its settings and the mode):")), FALSE, FALSE, 0);
++  entry = gtk_entry_new ();
++  gtk_entry_set_activates_default (GTK_ENTRY (entry), TRUE);
++  gtk_box_pack_start (GTK_BOX (box), entry, FALSE, FALSE, 0);
++  gtk_widget_show_all (box);
++
++  if (gtk_dialog_run (GTK_DIALOG (dialog)) != GTK_RESPONSE_ACCEPT)
++    {
++      gtk_widget_destroy (dialog);
++      return;
++    }
++  name = g_strstrip (g_strdup (gtk_entry_get_text (GTK_ENTRY (entry))));
++  gtk_widget_destroy (dialog);
++
++  if (*name == '\0' || strpbrk (name, "[]/") != NULL)
++    {
++      g_free (name);
++      return;
++    }
++
++  rc = xfce_rc_config_open (XFCE_RESOURCE_CONFIG, "Thunar/renamerrc", FALSE);
++  if (rc == NULL)
++    {
++      g_free (name);
++      return;
++    }
++  group = g_strconcat (TRD_PRESET_PREFIX, name, NULL);
++
++  /* never replace an existing preset silently: Enter = Cancel */
++  if (xfce_rc_has_group (rc, group))
++    {
++      dialog = gtk_message_dialog_new (GTK_WINDOW (renamer_dialog), GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION, GTK_BUTTONS_NONE,
++                                       _("A preset named \"%s\" already exists. Replace it?"), name);
++      gtk_dialog_add_button (GTK_DIALOG (dialog), _("Replace"), GTK_RESPONSE_ACCEPT);
++      gtk_dialog_add_button (GTK_DIALOG (dialog), _("_Cancel"), GTK_RESPONSE_CANCEL);
++      gtk_dialog_set_default_response (GTK_DIALOG (dialog), GTK_RESPONSE_CANCEL);
++      if (gtk_dialog_run (GTK_DIALOG (dialog)) != GTK_RESPONSE_ACCEPT)
++        {
++          gtk_widget_destroy (dialog);
++          xfce_rc_close (rc);
++          g_free (group);
++          g_free (name);
++          return;
++        }
++      gtk_widget_destroy (dialog);
++    }
++
++  xfce_rc_delete_group (rc, group, TRUE);
++  xfce_rc_set_group (rc, group);
++  xfce_rc_write_entry (rc, "_Renamer", G_OBJECT_TYPE_NAME (renamer));
++  klass = g_type_class_ref (THUNAR_TYPE_RENAMER_MODE);
++  value = g_enum_get_value (klass, thunar_renamer_model_get_mode (renamer_dialog->model));
++  if (value != NULL)
++    xfce_rc_write_entry (rc, "_Mode", value->value_name);
++  g_type_class_unref (klass);
++
++  settings = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
++  thunarx_renamer_save (renamer, settings);
++  g_hash_table_foreach (settings, trd_save_foreach, rc);
++  g_hash_table_destroy (settings);
++
++  xfce_rc_close (rc);
++  g_free (group);
++  g_free (name);
++}
++
++
++
++/* Delete / KP_Delete removes the selected files from the list */
++static gboolean
++thunar_renamer_dialog_tree_key_press (GtkWidget           *tree_view,
++                                      GdkEventKey         *event,
++                                      ThunarRenamerDialog *renamer_dialog)
++{
++  if (event->keyval == GDK_KEY_Delete || event->keyval == GDK_KEY_KP_Delete)
++    return thunar_renamer_dialog_action_remove_files (renamer_dialog);
++  return FALSE;
++}
++
++
++
++static gint
++trd_preset_cmp (gconstpointer a,
++                gconstpointer b)
++{
++  return g_utf8_collate (*(const gchar *const *) a, *(const gchar *const *) b);
++}
++
++
++
++static void
++thunar_renamer_dialog_presets_clicked (GtkWidget           *button,
++                                       ThunarRenamerDialog *renamer_dialog)
++{
++  GtkWidget *menu, *item, *sub;
++  XfceRc    *rc;
++  gchar    **groups;
++  GPtrArray *names;
++  guint      n;
++
++  names = g_ptr_array_new_with_free_func (g_free);
++  rc = xfce_rc_config_open (XFCE_RESOURCE_CONFIG, "Thunar/renamerrc", TRUE);
++  if (rc != NULL)
++    {
++      groups = xfce_rc_get_groups (rc);
++      for (n = 0; groups != NULL && groups[n] != NULL; ++n)
++        if (g_str_has_prefix (groups[n], TRD_PRESET_PREFIX))
++          g_ptr_array_add (names, g_strdup (groups[n] + strlen (TRD_PRESET_PREFIX)));
++      g_strfreev (groups);
++      xfce_rc_close (rc);
++    }
++  g_ptr_array_sort (names, trd_preset_cmp);
++
++  menu = gtk_menu_new ();
++  for (n = 0; n < names->len; ++n)
++    {
++      item = gtk_menu_item_new_with_label (g_ptr_array_index (names, n));
++      g_object_set_data_full (G_OBJECT (item), "preset-name", g_strdup (g_ptr_array_index (names, n)), g_free);
++      g_signal_connect (item, "activate", G_CALLBACK (trd_preset_apply), renamer_dialog);
++      gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
++    }
++  if (names->len == 0)
++    {
++      item = gtk_menu_item_new_with_label (_("(no presets yet)"));
++      gtk_widget_set_sensitive (item, FALSE);
++      gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
++    }
++  gtk_menu_shell_append (GTK_MENU_SHELL (menu), gtk_separator_menu_item_new ());
++
++  item = gtk_menu_item_new_with_label (_("Save current settings as preset…"));
++  g_signal_connect (item, "activate", G_CALLBACK (trd_preset_save), renamer_dialog);
++  gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
++
++  if (names->len > 0)
++    {
++      item = gtk_menu_item_new_with_label (_("Delete preset"));
++      sub = gtk_menu_new ();
++      gtk_menu_item_set_submenu (GTK_MENU_ITEM (item), sub);
++      for (n = 0; n < names->len; ++n)
++        {
++          GtkWidget *d = gtk_menu_item_new_with_label (g_ptr_array_index (names, n));
++          g_object_set_data_full (G_OBJECT (d), "preset-name", g_strdup (g_ptr_array_index (names, n)), g_free);
++          g_signal_connect (d, "activate", G_CALLBACK (trd_preset_delete), renamer_dialog);
++          gtk_menu_shell_append (GTK_MENU_SHELL (sub), d);
++        }
++      gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
++    }
++  g_ptr_array_free (names, TRUE);
++
++  gtk_widget_show_all (menu);
++  g_signal_connect_swapped (menu, "selection-done", G_CALLBACK (gtk_widget_destroy), menu);
++  gtk_menu_popup_at_widget (GTK_MENU (menu), button, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST, NULL);
++}
++
++
+ 
+ static gboolean
+ trd_audio_filter_func (const GtkFileFilterInfo *info,

@@ -1,0 +1,48 @@
+--- a/tiling/src/extension/tilingWindowManager.js
++++ b/tiling/src/extension/tilingWindowManager.js
+@@ -1,4 +1,4 @@
+-import { GLib, Meta, Mtk, Shell } from '../dependencies/gi.js';
++import { Clutter, GLib, Meta, Mtk, Shell } from '../dependencies/gi.js';
+ import { Main } from '../dependencies/shell.js';
+ import { getWindows } from '../dependencies/unexported/altTab.js';
+ 
+@@ -230,14 +230,31 @@
+             !skipAnim
+         ) {
+             wActor.remove_all_transitions();
+-            // HACK => journalctl: 'error in size change accounting'...?
+-            // TODO: no animation if going from maximized -> tiled and back to back multiple times?
+-            Main.wm._prepareAnimationInfo(
+-                global.window_manager,
+-                wActor,
+-                oldRect.meta,
+-                Meta.SizeChange.MAXIMIZE
+-            );
++            // 2026-11-04: a tile that keeps the window's size (left half <-> right half) is a plain slide of the window's own actor. The shell's
++            // _prepareAnimationInfo path (freeze the actor, snapshot it, offscreen-redirected clone, scale both) is for real size changes; used for a
++            // move it costs a lot on software rendering and always ends in mutter's "Error in size change accounting" (mutter never queued a size
++            // change for a move_resize_frame tile), and an actor whose 'size-changed' never comes stays frozen ("Old animationInfo removed").
++            // Tiles that do change the size keep the original shell path. To undo: restore the original block (tilingWindowManager.pre-slide.js).
++            const sameSize = Math.abs(oldRect.width - width) <= 2 && Math.abs(oldRect.height - height) <= 2;
++            if (sameSize) {
++                wActor.translation_x = oldRect.x - x;
++                wActor.translation_y = oldRect.y - y;
++                wActor.ease({
++                    translation_x: 0,
++                    translation_y: 0,
++                    duration: 250,
++                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
++                });
++            } else {
++                // HACK => journalctl: 'error in size change accounting'...?
++                // TODO: no animation if going from maximized -> tiled and back to back multiple times?
++                Main.wm._prepareAnimationInfo(
++                    global.window_manager,
++                    wActor,
++                    oldRect.meta,
++                    Meta.SizeChange.MAXIMIZE
++                );
++            }
+         }
+ 
+         if (!verticalMaximize && !horizontalMaximize && !maximize &&
