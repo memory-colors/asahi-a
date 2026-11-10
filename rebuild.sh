@@ -11,7 +11,7 @@
 #   packages  dnf install [install] list, then dnf remove [remove] list (capability-checked first)
 #   files     system files (/etc, /usr, /var), dconf settings, SELinux relabel
 #   services  enable / disable systemd units, default target
-#   apps      LosslessCut + czkawka-gui from GitHub releases
+#   apps      czkawka-gui from GitHub releases; LosslessCut only as a stock v3.69.0 fallback when the archive brings no fork (the fork is in the archive)
 #   archive   find <date>_asahi_home_full.tar.zst on a drive, unpack it (home, keys, Wi-Fi, icon themes, SF fonts)
 #   verify    compare installed packages and units against the recorded system (read-only)
 #
@@ -42,11 +42,12 @@ done
 # ---------------------------------------------------------------------------------------------------------------
 # WHAT GOES WHERE
 #   archive (publish step 1): ALL of $TARGET_HOME except ARCHIVE_EXCLUDES, plus the ARCHIVE_SYSTEM paths (root-only files).
-#   GitHub  (publish step 2): installer + lists.txt + files/system (system files) + files/dconf-user.ini + files/Software/asahi_atomic.
-#                             No home files: they come back from the archive.
+#   GitHub  (publish step 2): installer + lists.txt + files/system (system files) + files/dconf-user.ini + files/Software/asahi_atomic
+#                             + files/Software/fm-tweaks (the Thunar/Qt theming engine: text only, no .git; the archive has the full repo with history).
+#                             No other home files: they come back from the archive.
 # ---------------------------------------------------------------------------------------------------------------
 ARCHIVE_EXCLUDES=(Downloads Screenshots Screencasts Pictures Photo Video Music Audio Movies .index .cache .local/share/Trash
-    Software/asahi-a Software/czkawka-gui .local/share/LosslessCut            # last three: re-created by the repo / apps phase
+    Software/asahi-a Software/czkawka-gui                                      # re-created by the repo / apps phase
     .config/Claude/claude-code .config/Claude/Cache ".config/Claude/Code Cache" .config/Claude/GPUCache
     .config/Claude/DawnGraphiteCache .config/Claude/DawnWebGPUCache)           # Claude Desktop caches
 ARCHIVE_SYSTEM=(etc/NetworkManager/system-connections etc/mullvad-vpn var/lib/AccountsService/users/$TARGET_USER var/lib/AccountsService/icons/$TARGET_USER
@@ -147,6 +148,11 @@ phase_files() {
     run install -D -m 0440 "$A/reboot-picker-sudoers" /etc/sudoers.d/reboot-picker
     run visudo -cf /etc/sudoers.d/reboot-picker
     run dconf update
+    # fm-tweaks (Thunar/Qt theming engine): the archive phase brings back the full repo with history; this copy (no .git) is the fallback when the archive is missing or older
+    if [ -d "$REPO_DIR/files/Software/fm-tweaks" ] && [ ! -e "$TARGET_HOME/Software/fm-tweaks" ]; then
+        run install -d -o "$TARGET_USER" -g "$TARGET_USER" "$TARGET_HOME/Software"
+        run rsync -a --chown="$TARGET_USER:$TARGET_USER" "$REPO_DIR/files/Software/fm-tweaks"/ "$TARGET_HOME/Software/fm-tweaks"/
+    fi
     # --- home: comes back from the archive (archive phase); only the permissions are set here
     run chmod 700 "$TARGET_HOME"
     # --- GNOME settings (text dump -> user dconf db, on a private bus since no session is running)
@@ -170,19 +176,32 @@ phase_services() {
     echo "Not touched on purpose: asahi-*-firstboot and initial-setup (one-shot, remove themselves)."
 }
 
-phase_apps() {
-    say "apps (GitHub release binaries, installed as $TARGET_USER)"
+# LosslessCut: the real one is the custom zoom/rotate fork, which lives in the home folder and comes back with the archive.
+# Stock v3.69.0 is only a fallback, installed when no fork is there after the archive step (or when the archive phase is not part of this run).
+lc_install_stock() {
     local lc=https://github.com/mifi/lossless-cut/releases/download/v3.69.0/LosslessCut-linux-arm64.tar.bz2
-    local cz=https://github.com/qarmin/czkawka/releases/download/12.0.2/linux_czkawka_gui_heif_raw_avif_arm64
     local d=$TARGET_HOME/.local/share/LosslessCut
-    as_user mkdir -p "$d" "$TARGET_HOME/.local/bin" "$TARGET_HOME/Software/czkawka-gui"
+    as_user mkdir -p "$d" "$TARGET_HOME/.local/bin"
     if [ $DRY -eq 1 ]; then echo "[dry-run] download $lc -> $d"; else
         runuser -u "$TARGET_USER" -- sh -c "curl -fL '$lc' | tar xj -C '$d' --strip-components=1" || warn "LosslessCut download failed"
     fi
-    as_user ln -sfn "$d/losslesscut" "$TARGET_HOME/.local/bin/losslesscut"
+    [ -e "$TARGET_HOME/.local/bin/losslesscut" ] || as_user ln -sfn "$d/losslesscut" "$TARGET_HOME/.local/bin/losslesscut"   # a wrapper restored from the archive is kept
     # the arm64 release ships no ffmpeg; the installed copy points at the system (RPM Fusion) binaries
     as_user ln -sfn /usr/bin/ffmpeg  "$d/resources/ffmpeg"
     as_user ln -sfn /usr/bin/ffprobe "$d/resources/ffprobe"
+}
+lc_ensure() {
+    [ -x "$TARGET_HOME/.local/share/LosslessCut/losslesscut" ] && { echo "LosslessCut: present (from the archive)."; return 0; }
+    warn "no LosslessCut after the archive step (old archive, or archive skipped): installing STOCK v3.69.0, NOT the zoom/rotate fork. The fork's source is lossless-cut-zoom-source_*.tar.zst on the backup drive (fork/build.sh arm64)."
+    lc_install_stock
+}
+
+phase_apps() {
+    say "apps (GitHub release binaries, installed as $TARGET_USER)"
+    local cz=https://github.com/qarmin/czkawka/releases/download/12.0.2/linux_czkawka_gui_heif_raw_avif_arm64
+    if [[ " ${PHASES[*]} " == *" archive "* ]]; then echo "LosslessCut: comes back with the archive (stock v3.69.0 is installed afterwards only if no fork is found)."
+    else lc_install_stock; fi
+    as_user mkdir -p "$TARGET_HOME/Software/czkawka-gui"
     as_user curl -fL -o "$TARGET_HOME/Software/czkawka-gui/czkawka_gui" "$cz" || warn "czkawka download failed"
     as_user chmod +x "$TARGET_HOME/Software/czkawka-gui/czkawka_gui"
 }
@@ -260,6 +279,7 @@ pub_archive() {
 pub_sync() {   # live system -> $STAGE/files + $STAGE/lists.txt (in --dry-run $STAGE is a scratch copy, the repo is untouched)
     local F=$STAGE/files f rel k t base
     rsync -rltE --delete --safe-links --exclude=__pycache__ --exclude='*.bak*' --exclude='*.pyc' "$TARGET_HOME/Software/asahi_atomic"/ "$F/Software/asahi_atomic"/ || warn "rsync failed: asahi_atomic"
+    rsync -rltE --delete --safe-links --exclude=.git --exclude=__pycache__ --exclude='*.bak*' --exclude='*.pyc' --exclude='*.o' --exclude='*.so' "$TARGET_HOME/Software/fm-tweaks"/ "$F/Software/fm-tweaks"/ || warn "rsync failed: fm-tweaks"
     while IFS= read -r -d '' f; do          # system files already tracked in files/system
         rel=${f#"$F/system/"}
         [ "$rel" = etc/rpm/macros.image-language-conf ] && continue      # repo-only: installed by the repos phase, absent on A
@@ -358,9 +378,22 @@ pub_cleanup() {
     local items=() f
     for f in "$DEST"/*.partial; do [ -e "$f" ] && items+=("$f"); done
     case $WORK in /tmp/asahi-publish.*) items+=("$WORK") ;; esac
-    if [ ${#items[@]} -eq 0 ]; then echo "Nothing to clean up."; return 0; fi
-    echo "Left over from this run:"; for f in "${items[@]}"; do printf '  %s  (%s)\n' "$f" "$(du -sh "$f" 2>/dev/null | cut -f1)"; done
-    if confirm "Delete these?"; then for f in "${items[@]}"; do rm -rf -- "$f"; done; echo "Deleted."; fi
+    if [ ${#items[@]} -eq 0 ]; then echo "Nothing left over from this run."; else
+        echo "Left over from this run:"; for f in "${items[@]}"; do printf '  %s  (%s)\n' "$f" "$(du -sh "$f" 2>/dev/null | cut -f1)"; done
+        if confirm "Delete these?"; then for f in "${items[@]}"; do rm -rf -- "$f"; done; echo "Deleted."; fi
+    fi
+    # older archives + READMEs on the same drive (anything that is not this run's archive or today's README)
+    local old=() today; today=$(date +%F)
+    for f in "$DEST"/*_asahi_home_full.tar.zst; do
+        [ -e "$f" ] && [ "$f" != "$ARCHIVE_PATH" ] && old+=("$f")
+    done
+    for f in "$DEST"/*_asahi_restore_README.txt; do
+        [ -e "$f" ] && [ "$(basename "$f")" != "${today}_asahi_restore_README.txt" ] && old+=("$f")
+    done
+    if [ ${#old[@]} -eq 0 ]; then echo "No older archives or READMEs on this drive."; return 0; fi
+    echo "Older archives/READMEs on this drive:"; for f in "${old[@]}"; do printf '  %s  (%s)\n' "$f" "$(du -sh "$f" 2>/dev/null | cut -f1)"; done
+    if [ $DRY -eq 1 ]; then echo "[dry-run] would offer to delete these; nothing deleted"; return 0; fi
+    if confirm "Delete these older files?"; then for f in "${old[@]}"; do rm -f -- "$f"; done; echo "Deleted."; fi
 }
 
 pub_readme() {
@@ -385,7 +418,7 @@ GitHub:  https://github.com/memory-colors/asahi-a  (commit ${COMMIT:-?})
 Not automated (do by hand if wanted): bleachbit locale cleanup; dracut/plymouth initramfs rebuild; bootloader / m1n1;
 Claude Code install:  curl -fsSL https://claude.ai/install.sh | bash   (as $TARGET_USER)
 
-Not in the archive: ~/Downloads, ~/Screenshots, ~/Screencasts, ~/Pictures, ~/Photo, ~/Video, ~/Music, ~/Audio, ~/Movies, ~/.index, caches, Trash, LosslessCut and czkawka-gui (the "apps" phase downloads those).
+Not in the archive: ~/Downloads, ~/Screenshots, ~/Screencasts, ~/Pictures, ~/Photo, ~/Video, ~/Music, ~/Audio, ~/Movies, ~/.index, caches, Trash and czkawka-gui (the "apps" phase downloads czkawka). LosslessCut IS in the archive: it is the custom zoom/rotate fork build (stock v3.69.0 is downloaded only if the archive has no fork).
 TXT
     echo "Wrote $out"
     [ $DRY -eq 1 ] && cat "$out"
@@ -418,7 +451,8 @@ mountable_parts() {   # NAME|FSTYPE|SIZE|LABEL of unmounted partitions with a fi
     done
 }
 
-phase_archive() {
+phase_archive() { phase_archive_inner; lc_ensure; }
+phase_archive_inner() {
     say "archive"
     local opts=() mounted=() i pick kind val name fs size label
     if [ -n "$ARCHIVE" ]; then
